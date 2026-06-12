@@ -21,9 +21,9 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       REDIS_URL: ${REDIS_URL}
-      AUTH_SERVICE_URL: http://auth:${AUTH_PORT:-6001}
-      KERNEL_SERVICE_URL: http://kernel:${KERNEL_PORT:-6003}
-      COMPANY_SERVICE_URL: http://company:${COMPANY_PORT:-6005}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      COMPANY_SERVICE_URL: ${COMPANY_SERVICE_URL}
+      KERNEL_SERVICE_URL: ${KERNEL_SERVICE_URL}
     depends_on:
       auth:
         condition: service_healthy
