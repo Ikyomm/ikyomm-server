@@ -1,0 +1,39 @@
+{
+  "name": "@ikyomm/company",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm --dir ../.. --filter \"@ikyomm/company^...\" run build",
+    "build": "tsup --config ../../tsup.config.ts",
+    "predev": "pnpm run build:deps",
+    "dev": "tsx watch --env-file=../../env/.env src/index.ts",
+    "prestart": "pnpm run build:deps",
+    "start": "node dist/index.js",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome lint --write ./src",
+    "pretype-check": "pnpm run build:deps",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "@hono/zod-openapi": "^1.4.0",
+    "@ikyomm/database": "workspace:*",
+    "@ikyomm/logger": "workspace:*",
+    "@ikyomm/notification": "workspace:*",
+    "@ikyomm/utils": "workspace:*",
+    "@t3-oss/env-core": "^0.13.11",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.23",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@ikyomm/typescript-config": "workspace:*",
+    "@types/node": "^25.9.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

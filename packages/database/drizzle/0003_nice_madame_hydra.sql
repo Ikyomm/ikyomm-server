@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ommpod_type" ADD VALUE 'RESTORE' BEFORE 'SIGNATURE';

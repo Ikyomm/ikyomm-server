@@ -1,0 +1,1 @@
+ALTER TABLE "organization" RENAME COLUMN "credit_balance_currency_type" TO "currency_type";

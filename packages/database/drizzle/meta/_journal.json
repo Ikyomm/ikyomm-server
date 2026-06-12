@@ -1,0 +1,167 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1780733256423,
+      "tag": "0000_wise_magus",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780755647773,
+      "tag": "0001_messy_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780769083198,
+      "tag": "0002_soft_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780771369779,
+      "tag": "0003_nice_madame_hydra",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780939505017,
+      "tag": "0004_skinny_kate_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780939549448,
+      "tag": "0005_wealthy_mesmero",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781020800000,
+      "tag": "0006_sandbox_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781116200000,
+      "tag": "0007_remove_pod_address_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781118000000,
+      "tag": "0008_add_zone_location_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781165812382,
+      "tag": "0009_solid_centennial",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1781166600000,
+      "tag": "0010_remove_zone_location_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781167902256,
+      "tag": "0011_elite_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781169000000,
+      "tag": "0012_remove_device_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781196195075,
+      "tag": "0013_quick_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781197200000,
+      "tag": "0014_create_pod_mood_presets",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1781200555874,
+      "tag": "0015_peaceful_black_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1781201606220,
+      "tag": "0016_good_agent_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781202600000,
+      "tag": "0017_create_music_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781203600000,
+      "tag": "0018_move_playlist_links_to_mood_presets",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781204058172,
+      "tag": "0019_young_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781205200000,
+      "tag": "0020_add_user_company_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1781206046598,
+      "tag": "0021_first_rick_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781209088018,
+      "tag": "0022_nervous_gertrude_yorkes",
+      "breakpoints": true
+    }
+  ]
+}

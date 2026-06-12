@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./packages/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+
+  "references": [
+    { "path": "./packages/typescript-config" },
+    { "path": "./packages/logger" },
+    { "path": "./packages/database" },
+    { "path": "./packages/static" },
+    { "path": "./packages/utils" },
+    { "path": "./packages/notification" },
+    { "path": "./services/gateway" },
+    { "path": "./services/auth" },
+    { "path": "./services/kernel" },
+    { "path": "./services/company" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "**/dist", "**/.turbo"]
+}

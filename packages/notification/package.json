@@ -1,0 +1,45 @@
+{
+  "name": "@ikyomm/notification",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup --config ../../tsup.config.ts",
+    "email:dev": "node ./scripts/clean-email-appledouble.mjs && set -a && . ../../env/.env && set +a && email dev --dir src/email/templates --port \"${EMAIL_PREVIEW_PORT:-3005}\"",
+    "email:export": "node ./scripts/clean-email-appledouble.mjs && set -a && . ../../env/.env && set +a && email export --dir src/email/templates --outDir dist/email-preview",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome lint --write ./src",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.11",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-email": "^6.5.0",
+    "resend": "^6.12.4",
+    "tailwindcss": "^4.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@ikyomm/typescript-config": "workspace:*",
+    "@react-email/ui": "6.5.0",
+    "@types/node": "^25.9.2",
+    "@types/react": "^19.2.17",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

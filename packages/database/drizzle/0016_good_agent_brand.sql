@@ -1,0 +1,1 @@
+ALTER TABLE "pods" ADD COLUMN "pod_session_status" real DEFAULT 0 NOT NULL;

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://v2-9-16.turborepo.dev/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json", "package.json", ".env"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "inputs": ["src/**", "../../biome.json"],
+      "outputs": []
+    },
+    "lint:fix": {
+      "cache": false
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json"],
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

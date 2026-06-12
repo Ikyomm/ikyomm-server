@@ -1,0 +1,155 @@
+import { getDB, type DB } from "@ikyomm/database";
+import { AUTH_SESSION_REDIS_PREFIX, getRedisClient, initializeRedisClient } from "@ikyomm/utils";
+import { redisStorage } from "@better-auth/redis-storage";
+import { env } from "@/config/env";
+import { type OrgFields, orgFields } from "./fields/org";
+
+const AUTH_USER_STATUS_REDIS_PREFIX = "ommpods-auth-user-status:";
+const AUTH_USER_STATUS_REDIS_TTL_SECONDS = 30;
+
+export type CachedAuthUserStatus = {
+  id: string;
+  banned: boolean;
+  banReason: string | null;
+  role: string | null;
+  panel: string | null;
+  updatedAt: string;
+};
+
+function getTrustedOriginHosts(origins: string[]) {
+  return Array.from(
+    new Set(
+      origins.flatMap((origin) => {
+        try {
+          return [new URL(origin).host];
+        } catch {
+          return [];
+        }
+      })
+    )
+  );
+}
+
+function matchesCookieDomain(host: string, domain: string) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+export function getBetterAuthConfigState() {
+  const betterAuthUrl = new URL(env.BETTER_AUTH_URL);
+  const trustedOrigins = Array.from(new Set([...env.CORS_ALLOWED_ORIGINS, betterAuthUrl.origin]));
+  const isProduction = env.NODE_ENV === "production";
+  const crossSubDomainCookiesEnabled = isProduction && env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES;
+  const cookieDomain = env.BETTER_AUTH_COOKIE_DOMAIN;
+
+  if (crossSubDomainCookiesEnabled && !cookieDomain) {
+    throw new Error(
+      "BETTER_AUTH_COOKIE_DOMAIN is required when BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES=true"
+    );
+  }
+
+  if (crossSubDomainCookiesEnabled && cookieDomain) {
+    const incompatibleHosts = getTrustedOriginHosts(trustedOrigins).filter(
+      (host) => !matchesCookieDomain(host, cookieDomain)
+    );
+
+    if (incompatibleHosts.length > 0) {
+      throw new Error(
+        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must be a shared parent domain for all trusted origins. Incompatible hosts: ${incompatibleHosts.join(", ")}`
+      );
+    }
+  }
+
+  return {
+    betterAuthSecret: env.BETTER_AUTH_SECRET,
+    betterAuthUrl,
+    betterAuthAllowedHosts: getTrustedOriginHosts(trustedOrigins),
+    crossSubDomainCookies: crossSubDomainCookiesEnabled
+      ? {
+          enabled: true,
+          domain: cookieDomain,
+        }
+      : undefined,
+    isProduction,
+    trustedOrigins,
+  };
+}
+
+export function normalizeBasePath(pathname: string) {
+  const normalizedPathname = pathname.trim().replace(/\/+$/, "");
+  return normalizedPathname.length === 0 ? "/" : normalizedPathname;
+}
+
+export function resolveAuthDatabase(): DB {
+  try {
+    return getDB();
+  } catch {
+    // Better Auth CLI imports this file before service boot; it only needs config shape.
+    return {} as never;
+  }
+}
+
+export function resolveAuthSecondaryStorage() {
+  return redisStorage({
+    client: getRedisClient(),
+    keyPrefix: AUTH_SESSION_REDIS_PREFIX,
+  });
+}
+
+export async function initializeAuthSecondaryStorage() {
+  await initializeRedisClient();
+}
+
+export const organizationAdditionalFields = Array.isArray(orgFields)
+  ? Object.fromEntries(
+      orgFields.map((field: OrgFields) => [
+        field.name,
+        {
+          type: field.type,
+          input: field.input,
+          required: field.required,
+          defaultValue: field.defaultValue,
+        },
+      ])
+    )
+  : orgFields;
+
+// Add to utils.ts
+export function resolveEmailExistsCache() {
+  const redis = getRedisClient();
+  const PREFIX = "auth:email-exists:";
+  return {
+    get: (email: string) => redis.get(`${PREFIX}${email}`),
+    set: (email: string, value: "1" | "0") => redis.set(`${PREFIX}${email}`, value, "EX", 60),
+  };
+}
+
+export function resolveAuthUserStatusCache() {
+  const redis = getRedisClient();
+
+  return {
+    async get(userId: string): Promise<CachedAuthUserStatus | null> {
+      const raw = await redis.get(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+      if (!raw) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(raw) as CachedAuthUserStatus;
+      } catch {
+        await redis.del(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+        return null;
+      }
+    },
+    set(userId: string, value: CachedAuthUserStatus) {
+      return redis.set(
+        `${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`,
+        JSON.stringify(value),
+        "EX",
+        AUTH_USER_STATUS_REDIS_TTL_SECONDS
+      );
+    },
+    del(userId: string) {
+      return redis.del(`${AUTH_USER_STATUS_REDIS_PREFIX}${userId}`);
+    },
+  };
+}

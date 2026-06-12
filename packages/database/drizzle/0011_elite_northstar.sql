@@ -1,0 +1,1 @@
+ALTER TABLE "zone_location" DROP COLUMN "metadata";
