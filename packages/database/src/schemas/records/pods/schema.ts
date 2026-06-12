@@ -3,10 +3,7 @@ import { OmmPodStatus, OmmPodType } from "../enums";
 import { user } from "../../auth";
 import { zoneLocation } from "../../location";
 import { referenceColumns } from "../../reference-columns";
-import { ConnectedDeviceConfigItem } from "./types";
-
-
-
+import { ConnectedDeviceConfigItem, RateSlab } from "./types";
 
 export const pods = pgTable(
   "pods",
@@ -19,6 +16,9 @@ export const pods = pgTable(
 
     // session lock
     podSessionStatus: real("pod_session_status").notNull().default(0), // 0: unlocked, 1: locked, 2: pending unlock
+
+    // rate config
+    rateConfig: jsonb("rate_config").$type<RateSlab[]>().default([]),
 
     // Metadata
     locationId: text("location_id").references(() => zoneLocation.id, { onDelete: "set null" }),

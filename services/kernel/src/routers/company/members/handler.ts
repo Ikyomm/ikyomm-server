@@ -17,6 +17,7 @@ import {
   ban,
   create,
   get,
+  globalList,
   list,
   remove,
   remove_with_user,
@@ -42,6 +43,16 @@ registerOpenApiRoute(companyMembersGroup, list, async (c) => {
   const response = await fetchMemberList({
     ...query,
     organizationId: companyId,
+  });
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(companyMembersGroup, globalList, async (c) => {
+  const query = c.req.valid("query");
+  const response = await fetchMemberList({
+    ...query,
+    panel: "company",
   });
 
   return c.json(createSuccessResponse(response), 200);

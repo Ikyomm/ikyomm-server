@@ -9,8 +9,17 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { account, db, member, organization, user } from "@ikyomm/database";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import {
+  account,
+  db,
+  ikyommWallet,
+  member,
+  organization,
+  organizationWallet,
+  user,
+  walletTransactions,
+} from "@ikyomm/database";
+import { and, eq, gte, inArray, ne, sql } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@ikyomm/notification";
 import { fetchCompanyList } from "./list";
 import {
@@ -43,6 +52,9 @@ import {
 } from "./utils";
 
 export const companyMainGroup = new OpenAPIHono<AppBindings>();
+
+const createWalletLimitMessage = (available: number, requested: number) =>
+  `Ikyomm wallet limit reached. Available: ${available}, requested: ${requested}.`;
 
 registerOpenApiRoute(companyMainGroup, list, async (c) => {
   const query = c.req.valid("query");
@@ -133,65 +145,191 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
 
   stepsCompleted.push("validate_input");
 
-  const { userData, orgData } = await db.transaction(async (tx) => {
-    const [userData] = await tx
-      .insert(user)
-      .values({
-        id: authSeed.userId,
+  const initialCreditMinute = body.initialCreditMinute ?? 0;
+
+  const creationResult = await db
+    .transaction(async (tx) => {
+      let sourceWalletId: string | null = null;
+      let sourceWalletCreditMinute = 0;
+
+      if (initialCreditMinute > 0) {
+        const [sourceWallet] = await tx
+          .select()
+          .from(ikyommWallet)
+          .where(and(eq(ikyommWallet.singletonKey, "ikyomm"), eq(ikyommWallet.isDeleted, false)))
+          .limit(1);
+
+        if (!sourceWallet) {
+          throw new Error("IKYOMM_WALLET_NOT_FOUND");
+        }
+
+        sourceWalletId = sourceWallet.id;
+        sourceWalletCreditMinute = sourceWallet.creditMinute;
+      }
+
+      const [userData] = await tx
+        .insert(user)
+        .values({
+          id: authSeed.userId,
+          panel: "company",
+          role: "owner",
+          name: body.ownerName,
+          email: body.ownerEmail,
+          phoneNumber: body.ownerPhoneNumber,
+        })
+        .returning();
+      stepsCompleted.push("insert_user");
+
+      await tx.insert(account).values({
+        id: authSeed.accountId,
+        userId: authSeed.userId,
+        accountId: generateRandomId(),
+        providerId: "credential",
+        password: authSeed.hashedPassword,
+      });
+      stepsCompleted.push("insert_credential_account");
+
+      const [orgData] = await tx
+        .insert(organization)
+        .values({
+          id: nextOrgId,
+          name: body.name,
+          slug: body.slug,
+          logo: body.logo,
+          type: body.type,
+          platformMode: body.platformMode,
+          metadata: body.metadata,
+          country: body.country,
+          state: body.state,
+          city: body.city,
+          address: body.address,
+          email: body.email,
+          phoneNumber: body.phoneNumber,
+          websiteDomain: body.websiteDomain,
+          isActive: body.isActive ?? true,
+          createdByUser: currentAuthUser?.id ?? null,
+        })
+        .returning();
+      await ensureDefaultCompanyRoles(tx, orgData.id);
+      stepsCompleted.push("insert_organization");
+
+      const [orgWallet] = await tx
+        .insert(organizationWallet)
+        .values({
+          id: generateRandomId(),
+          organizationId: orgData.id,
+          createdByUser: currentAuthUser?.id ?? null,
+        })
+        .returning();
+      stepsCompleted.push("insert_organization_wallet");
+
+      if (initialCreditMinute > 0 && sourceWalletId) {
+        const debitedWallets = await tx
+          .update(ikyommWallet)
+          .set({
+            creditMinute: sql`${ikyommWallet.creditMinute} - ${initialCreditMinute}`,
+            updatedByUser: currentAuthUser?.id ?? null,
+          })
+          .where(
+            and(
+              eq(ikyommWallet.id, sourceWalletId),
+              gte(ikyommWallet.creditMinute, initialCreditMinute)
+            )
+          )
+          .returning();
+
+        if (debitedWallets.length === 0) {
+          throw new Error(createWalletLimitMessage(sourceWalletCreditMinute, initialCreditMinute));
+        }
+
+        await tx
+          .update(organizationWallet)
+          .set({
+            creditMinute: sql`${organizationWallet.creditMinute} + ${initialCreditMinute}`,
+            updatedByUser: currentAuthUser?.id ?? null,
+          })
+          .where(eq(organizationWallet.id, orgWallet.id));
+
+        await tx.insert(walletTransactions).values([
+          {
+            id: generateRandomId(),
+            type: "DEBIT",
+            status: "COMPLETED",
+            creditMinute: initialCreditMinute,
+            reference: "company_creation",
+            description: "Initial company wallet credits debited from Ikyomm wallet",
+            fromIkyommWalletId: sourceWalletId,
+            toIkyommWalletId: sourceWalletId,
+            createdByUser: currentAuthUser?.id ?? null,
+          },
+          {
+            id: generateRandomId(),
+            type: "CREDIT",
+            status: "COMPLETED",
+            creditMinute: initialCreditMinute,
+            reference: "company_creation",
+            description: "Initial company wallet credits credited from Ikyomm wallet",
+            fromOrganizationWalletId: orgWallet.id,
+            toOrganizationWalletId: orgWallet.id,
+            createdByUser: currentAuthUser?.id ?? null,
+          },
+        ]);
+      }
+      stepsCompleted.push("transfer_initial_credits");
+
+      await tx.insert(member).values({
+        id: generateRandomId(),
+        userId: authSeed.userId,
+        organizationId: orgData.id,
         panel: "company",
         role: "owner",
-        name: body.ownerName,
-        email: body.ownerEmail,
-        phoneNumber: body.ownerPhoneNumber,
-      })
-      .returning();
-    stepsCompleted.push("insert_user");
-
-    await tx.insert(account).values({
-      id: authSeed.accountId,
-      userId: authSeed.userId,
-      accountId: generateRandomId(),
-      providerId: "credential",
-      password: authSeed.hashedPassword,
-    });
-    stepsCompleted.push("insert_credential_account");
-
-    const [orgData] = await tx
-      .insert(organization)
-      .values({
-        id: nextOrgId,
-        name: body.name,
-        slug: body.slug,
-        logo: body.logo,
-        type: body.type,
-        platformMode: body.platformMode,
-        metadata: body.metadata,
-        country: body.country,
-        state: body.state,
-        city: body.city,
-        address: body.address,
-        email: body.email,
-        phoneNumber: body.phoneNumber,
-        websiteDomain: body.websiteDomain,
-        isActive: body.isActive ?? true,
         createdByUser: currentAuthUser?.id ?? null,
-      })
-      .returning();
-    await ensureDefaultCompanyRoles(tx, orgData.id);
-    stepsCompleted.push("insert_organization");
+      });
+      stepsCompleted.push("insert_member");
 
-    await tx.insert(member).values({
-      id: generateRandomId(),
-      userId: authSeed.userId,
-      organizationId: orgData.id,
-      panel: "company",
-      role: "owner",
-      createdByUser: currentAuthUser?.id ?? null,
+      return { userData, orgData };
+    })
+    .catch((error: unknown) => {
+      if (error instanceof Error && error.message === "IKYOMM_WALLET_NOT_FOUND") {
+        return "IKYOMM_WALLET_NOT_FOUND" as const;
+      }
+      if (error instanceof Error && error.message.includes("limit reached")) {
+        return error.message;
+      }
+      throw error;
     });
-    stepsCompleted.push("insert_member");
 
-    return { userData, orgData };
-  });
+  if (creationResult === "IKYOMM_WALLET_NOT_FOUND") {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Ikyomm wallet not found",
+      }),
+      404
+    );
+  }
+
+  if (typeof creationResult === "string" && creationResult.includes("limit reached")) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: creationResult,
+      }),
+      400
+    );
+  }
+
+  if (typeof creationResult === "string") {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "Company creation failed unexpectedly",
+      }),
+      500
+    );
+  }
+
+  const { userData, orgData } = creationResult;
 
   const company = await findCompanyById(orgData.id);
   if (!company) {

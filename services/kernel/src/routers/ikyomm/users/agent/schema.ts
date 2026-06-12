@@ -1,9 +1,10 @@
-import { organization, session, user } from "@ikyomm/database";
+import { organization, session, user, userWallet } from "@ikyomm/database";
 import {
   createDbSelectSchema,
   createListQuerySchema,
   createListResponseSchema,
   IdStringParamSchema,
+  optionalBooleanQuerySchema,
 } from "@ikyomm/utils";
 import { z } from "@hono/zod-openapi";
 
@@ -15,8 +16,15 @@ const appUserOrganizationSchema = createDbSelectSchema(organization).pick({
   isActive: true,
 });
 
+const appUserWalletSchema = createDbSelectSchema(userWallet).pick({
+  id: true,
+  userId: true,
+  creditMinute: true,
+});
+
 export const ommpodsAgentUserSchema = createDbSelectSchema(user).extend({
   organization: appUserOrganizationSchema.nullable().optional(),
+  wallet: appUserWalletSchema.nullable().optional(),
 });
 
 const agentUserMutableFields = {
@@ -32,6 +40,7 @@ const agentUserMutableFields = {
   employeeId: z.string().nullish(),
   employeeEmail: z.email("Invalid employee email address").nullish(),
   company: z.string().nullish(),
+  creditMinute: z.coerce.number().positive("Credit minutes must be greater than 0").optional(),
   banned: z.boolean().optional(),
   banReason: z.string().nullish(),
   banExpires: z.coerce.date().nullish(),
@@ -65,10 +74,10 @@ export const ommpodsAgentUserListQuerySchema = createListQuerySchema({
   extraShape: {
     role: z.string().optional(),
     company: z.string().optional(),
-    companyAssigned: z.coerce.boolean().optional(),
-    emailVerified: z.coerce.boolean().optional(),
-    banned: z.coerce.boolean().optional(),
-    isDeleted: z.coerce.boolean().optional(),
+    companyAssigned: optionalBooleanQuerySchema,
+    emailVerified: optionalBooleanQuerySchema,
+    banned: optionalBooleanQuerySchema,
+    isDeleted: optionalBooleanQuerySchema,
   },
 });
 

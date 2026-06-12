@@ -8,7 +8,7 @@ export const musicPlaylists = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
-    avatar: text("avatar").notNull(),
+    avatar: text("avatar"),
     ...referenceColumns(() => user.id),
   },
   (table) => [
@@ -22,14 +22,16 @@ export const musics = pgTable(
   "musics",
   {
     id: text("id").primaryKey(),
+    name: text("name").notNull(),
     playlistId: text("playlist_id")
       .notNull()
       .references(() => musicPlaylists.id, { onDelete: "cascade" }),
     fileUrl: text("file_url").notNull(),
-    avatar: text("avatar").notNull(),
+    avatar: text("avatar"),
     ...referenceColumns(() => user.id),
   },
   (table) => [
+    index("musics_name_idx").on(table.name),
     index("musics_playlistId_idx").on(table.playlistId),
     index("musics_fileUrl_idx").on(table.fileUrl),
     index("musics_isDeleted_createdAt_idx").on(table.isDeleted, table.createdAt),

@@ -111,6 +111,7 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
       ownerName: z.string().min(1, "Owner name is required"),
       ownerEmail: z.email("Invalid email address"),
       ownerPhoneNumber: z.string().optional(),
+      initialCreditMinute: z.coerce.number().nonnegative().optional(),
       websiteDomain: websiteDomainSchema.nullish(),
     });
   },
@@ -121,6 +122,8 @@ export const COMPANY_CREATION_STEPS = [
   "insert_user",
   "insert_credential_account",
   "insert_organization",
+  "insert_organization_wallet",
+  "transfer_initial_credits",
   "insert_member",
 ] as const;
 

@@ -27,11 +27,26 @@ export async function findMemberDetailsById(id: string) {
       deletedAt: member.deletedAt,
       isDeleted: member.isDeleted,
       deletedByUser: member.deletedByUser,
+      organization: {
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        logo: organization.logo,
+        isActive: organization.isActive,
+      },
       user,
     })
     .from(member)
+    .innerJoin(organization, eq(organization.id, member.organizationId))
     .innerJoin(user, eq(user.id, member.userId))
-    .where(and(eq(member.id, id), eq(member.isDeleted, false), eq(user.isDeleted, false)))
+    .where(
+      and(
+        eq(member.id, id),
+        eq(member.isDeleted, false),
+        eq(organization.isDeleted, false),
+        eq(user.isDeleted, false)
+      )
+    )
     .limit(1)
     .then((rows) => rows[0]);
 }

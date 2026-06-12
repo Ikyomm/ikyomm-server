@@ -11,9 +11,14 @@ import { z } from "@hono/zod-openapi";
 
 export const musicPlaylistSchema = createDbSelectSchema(musicPlaylists);
 
+const optionalAvatarSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+  z.string().trim().min(1).nullable().optional()
+);
+
 const musicPlaylistCreateUpdateShape = {
   name: z.string().trim().min(1),
-  avatar: z.string().trim().min(1),
+  avatar: optionalAvatarSchema,
 };
 
 export const musicPlaylistCreateSchema = createDbInsertSchema(musicPlaylists, {
@@ -42,7 +47,7 @@ export const musicPlaylistUpdateSchema = createDbUpdateSchema(musicPlaylists, {
   ],
 }).extend({
   name: z.string().trim().min(1).optional(),
-  avatar: z.string().trim().min(1).optional(),
+  avatar: optionalAvatarSchema,
 });
 
 export const musicPlaylistListSortFields = ["id", "name", "createdAt", "updatedAt"] as const;
@@ -51,6 +56,7 @@ export const musicPlaylistListQuerySchema = createListQuerySchema({
   sortFields: musicPlaylistListSortFields,
   extraShape: {
     isDeleted: optionalBooleanQuerySchema,
+    moodPresetId: z.string().trim().min(1).optional(),
   },
 });
 

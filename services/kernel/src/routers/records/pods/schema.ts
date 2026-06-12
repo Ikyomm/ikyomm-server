@@ -16,6 +16,13 @@ const connectedDeviceConfigItemSchema = z.object({
 
 export const connectedDeviceConfigSchema = z.array(connectedDeviceConfigItemSchema);
 
+const rateSlabSchema = z.object({
+  minute: z.number().min(1),
+  credit: z.number().min(1),
+});
+
+export const rateConfigSchema = z.array(rateSlabSchema);
+
 const assignmentSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -24,6 +31,7 @@ const assignmentSummarySchema = z.object({
 
 export const podSchema = createDbSelectSchema(pods).extend({
   connectedDeviceConfig: connectedDeviceConfigSchema,
+  rateConfig: z.preprocess((value) => value ?? [], rateConfigSchema),
   regionId: z.string().nullable().optional(),
   zoneId: z.string().nullable().optional(),
   region: assignmentSummarySchema.nullable(),
@@ -44,6 +52,7 @@ export const podCreateSchema = createDbInsertSchema(pods, {
   ],
 }).extend({
   connectedDeviceConfig: connectedDeviceConfigSchema.optional(),
+  rateConfig: rateConfigSchema.optional(),
 });
 
 export const podUpdateSchema = createDbUpdateSchema(pods, {
@@ -59,6 +68,7 @@ export const podUpdateSchema = createDbUpdateSchema(pods, {
   ],
 }).extend({
   connectedDeviceConfig: connectedDeviceConfigSchema.optional(),
+  rateConfig: rateConfigSchema.optional(),
 });
 
 export const podListSortFields = [

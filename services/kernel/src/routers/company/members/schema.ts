@@ -1,4 +1,4 @@
-import { member, user } from "@ikyomm/database";
+import { member, organization, user } from "@ikyomm/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
@@ -12,8 +12,16 @@ import z from "zod";
 export const memberSchema = createDbSelectSchema(member);
 
 export const memberListUserSchema = createDbSelectSchema(user);
+export const memberListOrganizationSchema = createDbSelectSchema(organization).pick({
+  id: true,
+  name: true,
+  slug: true,
+  logo: true,
+  isActive: true,
+});
 
 export const memberListItemSchema = memberSchema.extend({
+  organization: memberListOrganizationSchema,
   user: memberListUserSchema,
 });
 
@@ -74,6 +82,7 @@ export const memberListParamsSchema = IdStringParamSchema("companyId");
 export const memberListQuerySchema = createListQuerySchema({
   sortFields: ["name", "email", "role", "createdAt", "updatedAt"],
   extraShape: {
+    organizationId: z.string().optional(),
     role: z.string().optional(),
     panel: z.string().optional(),
     emailVerified: z.coerce.boolean().optional(),

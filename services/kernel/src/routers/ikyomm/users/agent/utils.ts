@@ -1,4 +1,4 @@
-import { account, db, organization, rbacRole, session, user } from "@ikyomm/database";
+import { account, db, organization, rbacRole, session, user, userWallet } from "@ikyomm/database";
 import {
   decryptPassword,
   encryptPassword,
@@ -46,25 +46,28 @@ export async function findOmmpodsAgentUserById(id: string, options?: IncludeDele
       deletedByUser: user.deletedByUser,
       isDeleted: user.isDeleted,
       organization,
+      wallet: userWallet,
     })
     .from(user)
     .leftJoin(organization, eq(organization.id, user.company))
+    .leftJoin(
+      userWallet,
+      and(eq(userWallet.userId, user.id), eq(userWallet.isDeleted, false))
+    )
     .where(whereClause)
     .limit(1)
     .then((rows) => rows[0]);
 }
 
-export async function findActiveAppRoleBySlug(slug: string, organizationId?: string | null) {
+export async function findActiveAppRoleBySlug(slug: string) {
   return db
     .select({ id: rbacRole.id, slug: rbacRole.slug })
     .from(rbacRole)
     .where(
       and(
         eq(rbacRole.slug, slug),
-        organizationId ? eq(rbacRole.panel, "company") : eq(rbacRole.panel, "app"),
-        organizationId
-          ? eq(rbacRole.organizationId, organizationId)
-          : isNull(rbacRole.organizationId),
+        eq(rbacRole.panel, "app"),
+        isNull(rbacRole.organizationId),
         eq(rbacRole.isActive, true)
       )
     )

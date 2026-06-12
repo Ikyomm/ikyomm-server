@@ -1,19 +1,22 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle list helper accepts flexible join builders. */
-import { getDB, organization, user } from "@ikyomm/database";
+import { getDB, organization, user, userWallet } from "@ikyomm/database";
 import { createTableListFetcher } from "@ikyomm/utils";
 import { and, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import type { ScopedOmmpodsAgentUserListQuery } from "./schema";
 
 function appUserListJoins(queryBuilder: any) {
-  return queryBuilder.leftJoin(organization, eq(organization.id, user.company));
+  return queryBuilder
+    .leftJoin(organization, eq(organization.id, user.company))
+    .leftJoin(userWallet, and(eq(userWallet.userId, user.id), eq(userWallet.isDeleted, false)));
 }
 
 function mapAppUserListItem(row: Record<string, unknown>) {
-  const { organization: organizationData, ...userData } = row;
+  const { organization: organizationData, user_wallet: walletData, ...userData } = row;
 
   return {
     ...userData,
     organization: organizationData,
+    wallet: walletData,
   };
 }
 
@@ -52,6 +55,7 @@ export const fetchOmmpodsAgentUserList = createTableListFetcher<
     deletedByUser: user.deletedByUser,
     isDeleted: user.isDeleted,
     organization,
+    user_wallet: userWallet,
   }),
   joins: appUserListJoins,
   where: ({ params }) =>

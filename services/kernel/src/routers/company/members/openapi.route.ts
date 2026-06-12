@@ -52,6 +52,21 @@ export const list = createOpenApiRoute({
   },
 });
 
+export const globalList = createOpenApiRoute({
+  method: "get",
+  path: "/list",
+  operationId: "companyMemberGlobalList",
+  tags,
+  middleware: [companyMethodsRateLimit, memberRbac.custom("getAll")],
+  summary: "List members across companies",
+  request: {
+    query: memberListQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(memberListResponseSchema, "Members fetched successfully"),
+  },
+});
+
 export const get = createOpenApiRoute({
   method: "get",
   path: "/{id}",

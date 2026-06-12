@@ -26,6 +26,14 @@ export const podMoodPresetSchema = createDbSelectSchema(podMoodPresets).extend({
   rgb: podMoodPresetRgbSchema,
   color: podMoodPresetColorSchema,
   playlistIds: z.array(z.string().trim().min(1)),
+  playlists: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+      })
+    )
+    .optional(),
 });
 
 const podMoodPresetCreateUpdateShape = {

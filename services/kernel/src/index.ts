@@ -17,6 +17,7 @@ import { companyGroup } from "@/routers/company";
 import { ikyommGroup } from "@/routers/ikyomm";
 import { locationGroup } from "@/routers/location";
 import { recordsGroup } from "@/routers/records";
+import { walletsGroup } from "@/routers/wallets";
 import type { AppBindings } from "@/types/app";
 import { openApiInfo } from "./config/openapi";
 
@@ -45,7 +46,8 @@ const routes = app
   .route("/ikyomm", ikyommGroup)
   .route("/location", locationGroup)
   .route("/ommpods", ikyommGroup)
-  .route("/records", recordsGroup);
+  .route("/records", recordsGroup)
+  .route("/wallets", walletsGroup);
 
 app.doc("/doc", openApiInfo);
 const docsHandler = createOpenApiDocsHandler({

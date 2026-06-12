@@ -1,11 +1,13 @@
 import { getTableColumns, getTableName, type Table } from "drizzle-orm";
 import {
   account,
+  ikyommWallet,
   invitation,
   member,
   musicPlaylists,
   musics,
   organization,
+  organizationWallet,
   podMoodPresets,
   pods,
   region,
@@ -13,6 +15,8 @@ import {
   rbacRolePermission,
   session,
   user,
+  userWallet,
+  walletTransactions,
   zone,
   zoneLocation,
 } from "./schemas";
@@ -28,10 +32,14 @@ const ACTIONS: Partial<Record<DatabaseResource, readonly string[]>> = {
   organization: [...DEFAULT_RESOURCE_ACTIONS, "activate", "restore"],
   music_playlists: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   musics: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
+  ikyomm_wallet: [...DEFAULT_RESOURCE_ACTIONS, "restore", "addCredits"],
+  organization_wallet: [...DEFAULT_RESOURCE_ACTIONS, "restore", "addCredits"],
   pod_mood_presets: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   pods: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   region: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   user: [...DEFAULT_RESOURCE_ACTIONS, "activate", "deactivate", "restore"],
+  user_wallet: [...DEFAULT_RESOURCE_ACTIONS, "restore", "addCredits"],
+  wallet_transactions: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   zone: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
   zone_location: [...DEFAULT_RESOURCE_ACTIONS, "restore"],
 };
@@ -40,10 +48,13 @@ const COMPANY_RESOURCES = new Set<DatabaseResource>([
   DATABASE_RESOURCES.account,
   DATABASE_RESOURCES.invitation,
   DATABASE_RESOURCES.member,
+  DATABASE_RESOURCES.organization_wallet,
   DATABASE_RESOURCES.rbac_role,
   DATABASE_RESOURCES.rbac_role_permission,
   DATABASE_RESOURCES.session,
   DATABASE_RESOURCES.user,
+  DATABASE_RESOURCES.user_wallet,
+  DATABASE_RESOURCES.wallet_transactions,
 ]);
 
 const APP_RESOURCES = new Set<DatabaseResource>([
@@ -60,7 +71,9 @@ const RESOURCE_TABLES = {
   member,
   music_playlists: musicPlaylists,
   musics,
+  ikyomm_wallet: ikyommWallet,
   organization,
+  organization_wallet: organizationWallet,
   pod_mood_presets: podMoodPresets,
   pods,
   region,
@@ -68,6 +81,8 @@ const RESOURCE_TABLES = {
   rbac_role_permission: rbacRolePermission,
   session,
   user,
+  user_wallet: userWallet,
+  wallet_transactions: walletTransactions,
   zone,
   zone_location: zoneLocation,
 } as const satisfies Record<DatabaseResource, Table>;

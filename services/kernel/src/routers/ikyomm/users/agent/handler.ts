@@ -2,7 +2,16 @@ import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { account, db, session, user } from "@ikyomm/database";
+import {
+  account,
+  db,
+  ikyommWallet,
+  organizationWallet,
+  session,
+  user,
+  userWallet,
+  walletTransactions,
+} from "@ikyomm/database";
 import { emailSubject, renderIkyommAppAccountCredEmail, sendEmail } from "@ikyomm/notification";
 import {
   createErrorResponse,
@@ -11,7 +20,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { fetchOmmpodsAgentUserList } from "./list";
 import {
   create,
@@ -38,6 +47,9 @@ import {
 } from "./utils";
 
 export const ikyommAppUsersGroup = new OpenAPIHono<AppBindings>();
+
+const createWalletLimitMessage = (walletLabel: string, available: number, requested: number) =>
+  `${walletLabel} limit reached. Available: ${available}, requested: ${requested}.`;
 
 registerOpenApiRoute(ikyommAppUsersGroup, list, async (c) => {
   const query = c.req.valid("query");
@@ -128,54 +140,230 @@ registerOpenApiRoute(ikyommAppUsersGroup, create, async (c) => {
   }
 
   const roleSlug = body.role ?? "owner";
-  const appRole = await findActiveAppRoleBySlug(roleSlug, companyId);
+  const appRole = await findActiveAppRoleBySlug(roleSlug);
 
   if (!appRole) {
     return c.json(
       createErrorResponse({
         error: "Bad Request",
-        message: companyId
-          ? `Create and activate the "${roleSlug}" company role before assigning it to this company app user`
-          : `Create and activate the "${roleSlug}" app role before assigning it to app users`,
+        message: `Create and activate the "${roleSlug}" app role before assigning it to app users`,
       }),
       400
     );
   }
 
   const authSeed = await createOmmpodsAgentAuthSeed(env.BETTER_AUTH_SECRET);
+  const initialCreditMinute = body.creditMinute ?? 0;
 
-  const userData = await db.transaction(async (tx) => {
-    const [insertedUser] = await tx
-      .insert(user)
-      .values({
-        id: authSeed.userId,
-        name: body.name,
-        email: body.email,
-        image: body.image,
-        role: appRole.slug,
-        panel: "app",
-        company: companyId,
-        phoneNumber: body.phoneNumber,
-        country: body.country,
-        state: body.state,
-        city: body.city,
-        address: body.address,
-        employeeId: body.employeeId,
-        employeeEmail: body.employeeEmail,
-        createdByUser: currentUser?.id,
-      })
-      .returning();
+  const userData = await db
+    .transaction(async (tx) => {
+      let sourceIkyommWalletId: string | null = null;
+      let sourceCompanyWalletId: string | null = null;
 
-    await tx.insert(account).values({
-      id: authSeed.accountId,
-      userId: authSeed.userId,
-      accountId: generateRandomId(),
-      providerId: "credential",
-      password: authSeed.hashedPassword,
+      if (initialCreditMinute > 0 && companyId) {
+        const [sourceWallet] = await tx
+          .select()
+          .from(organizationWallet)
+          .where(
+            and(
+              eq(organizationWallet.organizationId, companyId),
+              eq(organizationWallet.isDeleted, false)
+            )
+          )
+          .limit(1);
+
+        if (!sourceWallet) {
+          throw new Error("COMPANY_WALLET_NOT_FOUND");
+        }
+
+        sourceCompanyWalletId = sourceWallet.id;
+
+        const debitedWallets = await tx
+          .update(organizationWallet)
+          .set({
+            creditMinute: sql`${organizationWallet.creditMinute} - ${initialCreditMinute}`,
+            updatedByUser: currentUser?.id ?? null,
+          })
+          .where(
+            and(
+              eq(organizationWallet.id, sourceWallet.id),
+              gte(organizationWallet.creditMinute, initialCreditMinute)
+            )
+          )
+          .returning({ id: organizationWallet.id });
+
+        if (debitedWallets.length === 0) {
+          throw new Error(
+            createWalletLimitMessage(
+              "Company wallet",
+              sourceWallet.creditMinute,
+              initialCreditMinute
+            )
+          );
+        }
+      }
+
+      if (initialCreditMinute > 0 && !companyId) {
+        const [sourceWallet] = await tx
+          .select()
+          .from(ikyommWallet)
+          .where(and(eq(ikyommWallet.singletonKey, "ikyomm"), eq(ikyommWallet.isDeleted, false)))
+          .limit(1);
+
+        if (!sourceWallet) {
+          throw new Error("IKYOMM_WALLET_NOT_FOUND");
+        }
+
+        sourceIkyommWalletId = sourceWallet.id;
+
+        const debitedWallets = await tx
+          .update(ikyommWallet)
+          .set({
+            creditMinute: sql`${ikyommWallet.creditMinute} - ${initialCreditMinute}`,
+            updatedByUser: currentUser?.id ?? null,
+          })
+          .where(
+            and(
+              eq(ikyommWallet.id, sourceWallet.id),
+              gte(ikyommWallet.creditMinute, initialCreditMinute)
+            )
+          )
+          .returning({ id: ikyommWallet.id });
+
+        if (debitedWallets.length === 0) {
+          throw new Error(
+            createWalletLimitMessage("Ikyomm wallet", sourceWallet.creditMinute, initialCreditMinute)
+          );
+        }
+      }
+
+      const [insertedUser] = await tx
+        .insert(user)
+        .values({
+          id: authSeed.userId,
+          name: body.name,
+          email: body.email,
+          image: body.image,
+          role: appRole.slug,
+          panel: "app",
+          company: companyId,
+          phoneNumber: body.phoneNumber,
+          country: body.country,
+          state: body.state,
+          city: body.city,
+          address: body.address,
+          employeeId: body.employeeId,
+          employeeEmail: body.employeeEmail,
+          createdByUser: currentUser?.id,
+        })
+        .returning();
+
+      await tx.insert(account).values({
+        id: authSeed.accountId,
+        userId: authSeed.userId,
+        accountId: generateRandomId(),
+        providerId: "credential",
+        password: authSeed.hashedPassword,
+      });
+
+      if (initialCreditMinute > 0) {
+        const [destinationWallet] = await tx
+          .insert(userWallet)
+          .values({
+            id: generateRandomId(),
+            userId: insertedUser.id,
+            creditMinute: initialCreditMinute,
+            createdByUser: currentUser?.id ?? null,
+          })
+          .returning();
+
+        await tx.insert(walletTransactions).values([
+          {
+            id: generateRandomId(),
+            type: "DEBIT",
+            status: "COMPLETED",
+            creditMinute: initialCreditMinute,
+            description: companyId
+              ? "Initial app user credits debited from company wallet"
+              : "Initial app user credits debited from Ikyomm wallet",
+            fromIkyommWalletId: sourceIkyommWalletId,
+            toIkyommWalletId: sourceIkyommWalletId,
+            fromOrganizationWalletId: sourceCompanyWalletId,
+            toOrganizationWalletId: sourceCompanyWalletId,
+            createdByUser: currentUser?.id ?? null,
+          },
+          {
+            id: generateRandomId(),
+            type: "CREDIT",
+            status: "COMPLETED",
+            creditMinute: initialCreditMinute,
+            description: companyId
+              ? "Initial app user credits credited from company wallet"
+              : "Initial app user credits credited from Ikyomm wallet",
+            fromUserWalletId: destinationWallet.id,
+            toUserWalletId: destinationWallet.id,
+            createdByUser: currentUser?.id ?? null,
+          },
+        ]);
+      }
+
+      return insertedUser;
+    })
+    .catch((error: unknown) => {
+      if (error instanceof Error) {
+        if (error.message === "IKYOMM_WALLET_NOT_FOUND") {
+          return "IKYOMM_WALLET_NOT_FOUND" as const;
+        }
+        if (error.message === "COMPANY_WALLET_NOT_FOUND") {
+          return "COMPANY_WALLET_NOT_FOUND" as const;
+        }
+        if (error.message.includes("limit reached")) {
+          return error.message;
+        }
+      }
+
+      throw error;
     });
 
-    return insertedUser;
-  });
+  if (userData === "IKYOMM_WALLET_NOT_FOUND") {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Ikyomm wallet not found",
+      }),
+      404
+    );
+  }
+
+  if (userData === "COMPANY_WALLET_NOT_FOUND") {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Company wallet not found",
+      }),
+      404
+    );
+  }
+
+  if (typeof userData === "string" && userData.includes("limit reached")) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: userData,
+      }),
+      400
+    );
+  }
+
+  if (typeof userData === "string") {
+    return c.json(
+      createErrorResponse({
+        error: "Internal Server Error",
+        message: "App user creation failed unexpectedly",
+      }),
+      500
+    );
+  }
 
   const userWithCompany = await findOmmpodsAgentUserById(userData.id, { includeDeleted: true });
 
@@ -260,15 +448,13 @@ registerOpenApiRoute(ikyommAppUsersGroup, update, async (c) => {
 
   if (body.role || body.company !== undefined) {
     const roleSlug = body.role ?? existingUser.role;
-    const appRole = await findActiveAppRoleBySlug(roleSlug, nextCompanyId);
+    const appRole = await findActiveAppRoleBySlug(roleSlug);
 
     if (!appRole) {
       return c.json(
         createErrorResponse({
           error: "Bad Request",
-          message: nextCompanyId
-            ? "Select a valid active company role"
-            : "Select a valid active app role",
+          message: "Select a valid active app role",
         }),
         400
       );

@@ -3,3 +3,7 @@ export type ConnectedDeviceConfigItem = {
   value: string;
 };
 
+export type RateSlab = {
+  minute: number;
+  credit: number;
+};

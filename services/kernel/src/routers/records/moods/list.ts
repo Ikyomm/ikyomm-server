@@ -1,10 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
-import { getDB, podMoodPresets } from "@ikyomm/database";
+import { getDB, musicPlaylists, podMoodPresets } from "@ikyomm/database";
 import { createTableListFetcher } from "@ikyomm/utils";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { PodMoodPresetListQuery } from "./schema";
 
-export const fetchPodMoodPresetList = createTableListFetcher<
+const fetchPodMoodPresetBaseList = createTableListFetcher<
   typeof podMoodPresets,
   typeof podMoodPresets.$inferSelect,
   PodMoodPresetListQuery
@@ -34,3 +34,33 @@ export const fetchPodMoodPresetList = createTableListFetcher<
     updatedAt: podMoodPresets.updatedAt,
   },
 });
+
+export const fetchPodMoodPresetList = async (params: PodMoodPresetListQuery) => {
+  const response = await fetchPodMoodPresetBaseList(params);
+  const playlistIds = [
+    ...new Set(response.items.flatMap((moodPreset) => moodPreset.playlistIds ?? [])),
+  ];
+
+  if (playlistIds.length === 0) {
+    return response;
+  }
+
+  const playlists = await getDB()
+    .select({
+      id: musicPlaylists.id,
+      name: musicPlaylists.name,
+    })
+    .from(musicPlaylists)
+    .where(inArray(musicPlaylists.id, playlistIds));
+  const playlistById = new Map(playlists.map((playlist) => [playlist.id, playlist]));
+
+  return {
+    ...response,
+    items: response.items.map((moodPreset) => ({
+      ...moodPreset,
+      playlists: (moodPreset.playlistIds ?? [])
+        .map((playlistId) => playlistById.get(playlistId))
+        .filter((playlist): playlist is (typeof playlists)[number] => Boolean(playlist)),
+    })),
+  };
+};

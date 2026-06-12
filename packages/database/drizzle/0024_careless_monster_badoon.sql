@@ -1,0 +1,1 @@
+ALTER TABLE "pods" ADD COLUMN "rate_config" jsonb DEFAULT '[]'::jsonb;

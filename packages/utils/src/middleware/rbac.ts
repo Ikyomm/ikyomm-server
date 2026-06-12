@@ -13,6 +13,7 @@ export const RBAC_WILDCARD_RESOURCE = "*" as const;
 export const RBAC_WILDCARD_ACTION = "*" as const;
 export type RbacResource = DatabaseResource | typeof RBAC_WILDCARD_RESOURCE;
 export const RBAC_ACTIONS = {
+  addCredits: "addCredits",
   activate: "activate",
   create: "create",
   deactivate: "deactivate",

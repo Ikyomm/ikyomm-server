@@ -9,12 +9,25 @@ import {
 } from "@ikyomm/utils";
 import { z } from "@hono/zod-openapi";
 
-export const musicSchema = createDbSelectSchema(musics);
+export const musicSchema = createDbSelectSchema(musics).extend({
+  playlist: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+    })
+    .optional(),
+});
+
+const optionalAvatarSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+  z.string().trim().min(1).nullable().optional()
+);
 
 const musicCreateUpdateShape = {
+  name: z.string().trim().min(1),
   playlistId: z.string().trim().min(1),
   fileUrl: z.string().trim().min(1),
-  avatar: z.string().trim().min(1),
+  avatar: optionalAvatarSchema,
 };
 
 export const musicCreateSchema = createDbInsertSchema(musics, {
@@ -42,12 +55,13 @@ export const musicUpdateSchema = createDbUpdateSchema(musics, {
     "deletedByUser",
   ],
 }).extend({
+  name: z.string().trim().min(1).optional(),
   playlistId: z.string().trim().min(1).optional(),
   fileUrl: z.string().trim().min(1).optional(),
-  avatar: z.string().trim().min(1).optional(),
+  avatar: optionalAvatarSchema,
 });
 
-export const musicListSortFields = ["id", "playlistId", "createdAt", "updatedAt"] as const;
+export const musicListSortFields = ["id", "name", "playlistId", "createdAt", "updatedAt"] as const;
 
 export const musicListQuerySchema = createListQuerySchema({
   sortFields: musicListSortFields,
