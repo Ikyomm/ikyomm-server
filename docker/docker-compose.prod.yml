@@ -2,8 +2,24 @@ name: ikyomm-server
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
-  networks:
-    - app-network
+  init: true
+  stop_grace_period: 20s
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  logging:
+    driver: local
+    options:
+      max-size: ${DOCKER_LOG_MAX_SIZE}
+      max-file: ${DOCKER_LOG_MAX_FILE}
 
 services:
   gateway:
