@@ -27,7 +27,7 @@
     "@t3-oss/env-core": "^0.13.11",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-email": "^6.5.0",
+    "react-email": "^6.6.0",
     "resend": "^6.12.4",
     "tailwindcss": "^4.3.0",
     "zod": "^4.4.3"
