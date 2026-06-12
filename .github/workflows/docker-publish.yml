@@ -24,16 +24,16 @@ jobs:
       matrix:
         include:
           - service: gateway
-            image_name: ommpods-gateway
+            image_name: ikyomm-gateway
             dockerfile: docker/gateway.Dockerfile
           - service: auth
-            image_name: ommpods-auth
+            image_name: ikyomm-auth
             dockerfile: docker/auth.Dockerfile
           - service: kernel
-            image_name: ommpods-kernel
+            image_name: ikyomm-kernel
             dockerfile: docker/kernel.Dockerfile
           - service: company
-            image_name: ommpods-company
+            image_name: ikyomm-company
             dockerfile: docker/company.Dockerfile
 
     steps:
@@ -53,8 +53,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ vars.GHCR_USERNAME || github.actor }}
-          password: ${{ secrets.GHCR_TOKEN || github.token }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: meta
