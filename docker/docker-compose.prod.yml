@@ -3,6 +3,8 @@ name: ikyomm-server
 x-service-defaults: &service-defaults
   restart: unless-stopped
   init: true
+  networks:
+    - dokploy-network
   stop_grace_period: 20s
   read_only: true
   tmpfs:
@@ -178,4 +180,3 @@ networks:
   dokploy-network:
     name: ${DOKPLOY_NETWORK_NAME:-dokploy-network}
     external: true
-
