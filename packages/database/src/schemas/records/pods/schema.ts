@@ -14,9 +14,6 @@ export const pods = pgTable(
     type: OmmPodType("type").notNull(),
     status: OmmPodStatus("status").notNull(),
 
-    // session lock
-    podSessionStatus: real("pod_session_status").notNull().default(0), // 0: unlocked, 1: locked, 2: pending unlock
-
     // rate config
     rateConfig: jsonb("rate_config").$type<RateSlab[]>().default([]),
 
