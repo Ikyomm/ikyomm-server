@@ -2,6 +2,7 @@ import {
   type AnyPgColumn,
   boolean,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -10,6 +11,11 @@ import {
 import { AccessPanel, PlatformMode, OrganizationType } from "./enums";
 import { referenceColumns } from "../reference-columns";
 import { region, zone, zoneLocation } from "../location";
+
+export type UserMetadata = {
+  age?: number | null;
+  gender?: "male" | "female" | "dont_disclose" | null;
+};
 
 export const user = pgTable(
   "user",
@@ -36,6 +42,7 @@ export const user = pgTable(
     image: text("image"),
     role: text("role").default("user").notNull(),
     panel: AccessPanel("panel").default("ikyomm").notNull(),
+    metadata: jsonb("metadata").$type<UserMetadata>(),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
     banExpires: timestamp("ban_expires"),

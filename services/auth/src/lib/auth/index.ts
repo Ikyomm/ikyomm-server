@@ -153,6 +153,7 @@ async function createAuthInstance() {
           banReason?: string | null;
           role?: string | null;
           panel?: string | null;
+          metadata?: schema.UserMetadata | null;
         };
 
         const cachedUser = await userStatusCache.get(sessionUser.id);
@@ -167,6 +168,7 @@ async function createAuthInstance() {
                 banReason: schema.user.banReason,
                 role: schema.user.role,
                 panel: schema.user.panel,
+                metadata: schema.user.metadata,
                 updatedAt: schema.user.updatedAt,
               })
               .from(schema.user)
@@ -183,6 +185,7 @@ async function createAuthInstance() {
               banReason: dbUser.banReason,
               role: dbUser.role,
               panel: dbUser.panel,
+              metadata: dbUser.metadata,
               updatedAt: dbUser.updatedAt.toISOString(),
             };
 
@@ -208,6 +211,7 @@ async function createAuthInstance() {
           banReason: liveUser?.banReason ?? sessionUser.banReason,
           role: liveUser?.role ?? sessionUser.role,
           panel: liveUser?.panel ?? sessionUser.panel,
+          metadata: liveUser?.metadata ?? sessionUser.metadata ?? null,
         };
         const activeOrganizationId =
           typeof sessionWithOrganization.activeOrganizationId === "string"
@@ -419,6 +423,7 @@ async function createAuthInstance() {
               banned: schema.user.banned,
               ban: schema.user.banReason,
               panel: schema.user.panel,
+              metadata: schema.user.metadata,
               // employee details
               employeeId: schema.user.employeeId,
               employeeEmail: schema.user.employeeEmail,

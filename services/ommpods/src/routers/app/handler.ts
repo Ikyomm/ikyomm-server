@@ -82,6 +82,7 @@ appGroup.get("/me", async (c) => {
         role: currentUser.role ?? null,
         panel: currentUser.panel ?? null,
         companyId: currentUser.company ?? null,
+        metadata: currentUser.metadata ?? null,
       },
       company: company
         ? {

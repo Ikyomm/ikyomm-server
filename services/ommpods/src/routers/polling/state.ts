@@ -13,6 +13,7 @@ import {
   secondsBetween,
   secondsUntil,
 } from "../shared";
+import { broadcastPollingDataForPod } from "./realtime";
 import { pollingResponseSchema, type PollingResponse } from "./schema";
 
 const POLLING_REDIS_KEY_PREFIX = "ommpods:polling:pods";
@@ -300,6 +301,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
     };
 
     await persistPollingState(buildCachedPollingState(podId, data, null));
+    broadcastPollingDataForPod(podId, data);
     return data;
   }
 
@@ -325,6 +327,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
     };
 
     await persistPollingState(buildCachedPollingState(podId, data, null));
+    broadcastPollingDataForPod(podId, data);
     return data;
   }
 
@@ -353,5 +356,6 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   };
 
   await persistPollingState(buildCachedPollingState(podId, data, sessionResponse.timing));
+  broadcastPollingDataForPod(podId, data);
   return data;
 }

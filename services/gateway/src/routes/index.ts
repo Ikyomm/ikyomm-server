@@ -44,6 +44,7 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
 ]);
 const OMMPODS_POLLING_STALE_MAX_AGE_MS = 10_000;
 const OMMPODS_POLLING_CACHE_MAX_ENTRIES = 1_000;
+const OMMPODS_POLLING_FALLBACK_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 type OmmpodsPollingCacheEntry = {
   body: ArrayBuffer;
@@ -328,7 +329,8 @@ function createOmmpodsPollingFallbackResponse(c: Context, error: unknown) {
         podData: {
           connectedDeviceConfig: [],
           aromaDufuser: {
-            defuserMacId: null,
+            defuserMacIds: [],
+            activeDefuserMacId: null,
             activeDufuserContainerNumber: null,
           },
         },
@@ -390,7 +392,7 @@ function createProxyHandler(route: ProxyRoute) {
           : await response.arrayBuffer();
       const isPollingRequest = isOmmpodsPollingRequest(c, route);
 
-      if (isPollingRequest && response.status >= 500) {
+      if (isPollingRequest && OMMPODS_POLLING_FALLBACK_STATUSES.has(response.status)) {
         return createOmmpodsPollingFallbackResponse(c, {
           status: response.status,
           statusText: response.statusText,

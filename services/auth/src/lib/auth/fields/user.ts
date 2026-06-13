@@ -1,6 +1,6 @@
 export type UserFields = {
   name: string;
-  type: "string" | "number" | "boolean" | "date" | "string[]";
+  type: "string" | "number" | "boolean" | "date" | "string[]" | "json";
   input: boolean;
   required?: boolean;
   fieldName?: string;
@@ -15,6 +15,11 @@ export const userFields: UserFields[] = [
     name: "panel",
     type: "string",
     input: false,
+  },
+  {
+    name: "metadata",
+    type: "json",
+    input: true,
   },
   {
     name: "employeeId",

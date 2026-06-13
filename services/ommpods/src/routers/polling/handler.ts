@@ -13,7 +13,7 @@ import { pollingResponseSchema, type PollingResponse } from "./schema";
 
 export const pollingGroup = new OpenAPIHono<AppBindings>();
 
-type PollingDataSource = "redis" | "live" | "stale" | "safe-default";
+type PollingDataSource = "redis" | "live" | "memory" | "stale" | "safe-default";
 
 type PollingCacheEntry = {
   data?: PollingResponse;
@@ -28,6 +28,7 @@ type PollingReadResult = {
 };
 
 const POLLING_RESPONSE_TIMEOUT_MS = 800;
+const POLLING_MEMORY_CACHE_MAX_AGE_MS = 1_500;
 const POLLING_STALE_MAX_AGE_MS = 10_000;
 const POLLING_CACHE_MAX_ENTRIES = 1_000;
 const pollingCache = new Map<string, PollingCacheEntry>();
@@ -126,6 +127,16 @@ function startPollingFetch(podId: string): Promise<PollingReadResult> {
 }
 
 async function readPollingData(podId: string): Promise<PollingReadResult> {
+  const existing = pollingCache.get(podId);
+  const now = Date.now();
+
+  if (existing?.data && now - existing.updatedAt <= POLLING_MEMORY_CACHE_MAX_AGE_MS) {
+    return {
+      data: existing.data,
+      source: "memory",
+    };
+  }
+
   const redisData = await readPollingDataFromRedis(podId);
   if (redisData) {
     setPollingCacheData(podId, redisData);
@@ -134,8 +145,6 @@ async function readPollingData(podId: string): Promise<PollingReadResult> {
       source: "redis",
     };
   }
-
-  const existing = pollingCache.get(podId);
 
   if (existing?.inFlight && existing.data) {
     return getPollingFallback(podId);

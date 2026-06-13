@@ -13,6 +13,7 @@ export type CachedAuthUserStatus = {
   banReason: string | null;
   role: string | null;
   panel: string | null;
+  metadata?: import("@ikyomm/database").UserMetadata | null;
   updatedAt: string;
 };
 

@@ -15,6 +15,7 @@ import { env } from "@/config/env";
 import { openApiInfo } from "@/config/openapi";
 import { logger } from "@/lib/logger";
 import { ommpodsRoutes } from "@/routers";
+import { registerOmmpodsSocketServer } from "@/routers/polling/socket";
 import type { AppBindings } from "@/types/app";
 
 const app = new OpenAPIHono<AppBindings>();
@@ -54,13 +55,15 @@ app.onError(createErrorHandler({ serviceName: "ommpods", logger }));
 
 await initDB({ logger, serviceName: "ommpods" });
 
-serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info("service started", {
     port: info.port,
     baseUrl: `http://localhost:${info.port}`,
     healthPath: "/health",
   });
 });
+
+registerOmmpodsSocketServer(server);
 
 export type AppType = typeof routes;
 

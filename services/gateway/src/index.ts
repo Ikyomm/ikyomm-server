@@ -13,7 +13,10 @@ import { logger } from "@/lib/logger";
 import { logGatewayProxyRoutes, registerGatewayRoutes } from "@/routes";
 
 const app = new OpenAPIHono();
-applyAppSecurity(app, { corsOrigins: env.CORS_ALLOWED_ORIGINS });
+applyAppSecurity(app, {
+  corsOrigins: env.CORS_ALLOWED_ORIGINS,
+  globalRateLimitSkipPaths: ["/api/ommpods/polling"],
+});
 app.use("*", createHonoRequestLogger(logger));
 registerGatewayRoutes(app);
 

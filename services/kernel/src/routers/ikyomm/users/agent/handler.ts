@@ -7,6 +7,7 @@ import {
   db,
   ikyommWallet,
   organizationWallet,
+  podSessions,
   session,
   user,
   userWallet,
@@ -20,7 +21,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { fetchOmmpodsAgentUserList } from "./list";
 import {
   create,
@@ -545,8 +546,34 @@ registerOpenApiRoute(ikyommAppUsersGroup, removePermanently, async (c) => {
     );
   }
 
-  const [deletedUser] = await db.delete(user).where(eq(user.id, id)).returning({
-    id: user.id,
+  const deletedUser = await db.transaction(async (tx) => {
+    const appUserWallets = await tx
+      .select({ id: userWallet.id })
+      .from(userWallet)
+      .where(eq(userWallet.userId, id));
+    const appUserWalletIds = appUserWallets.map((wallet) => wallet.id);
+
+    if (appUserWalletIds.length > 0) {
+      await tx
+        .delete(walletTransactions)
+        .where(
+          or(
+            inArray(walletTransactions.fromUserWalletId, appUserWalletIds),
+            inArray(walletTransactions.toUserWalletId, appUserWalletIds)
+          )
+        );
+    }
+
+    await tx.delete(podSessions).where(eq(podSessions.userId, id));
+    await tx.delete(session).where(eq(session.userId, id));
+    await tx.delete(account).where(eq(account.userId, id));
+    await tx.delete(userWallet).where(eq(userWallet.userId, id));
+
+    const [removedUser] = await tx.delete(user).where(eq(user.id, id)).returning({
+      id: user.id,
+    });
+
+    return removedUser;
   });
 
   if (!deletedUser) {

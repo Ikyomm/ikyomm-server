@@ -218,6 +218,13 @@
       "when": 1781328001000,
       "tag": "0030_aroma_defuser_name",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1781344207415,
+      "tag": "0032_eager_chamber",
+      "breakpoints": true
     }
   ]
 }
