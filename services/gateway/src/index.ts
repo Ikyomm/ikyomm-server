@@ -11,6 +11,7 @@ import { openApiInfo } from "@/config/openapi";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { logGatewayProxyRoutes, registerGatewayRoutes } from "@/routes";
+import { registerGatewaySocketProxy } from "@/socket-proxy";
 
 const app = new OpenAPIHono();
 applyAppSecurity(app, {
@@ -57,7 +58,7 @@ app.get(
   })
 );
 
-serve({ fetch: app.fetch, port: env.PORT }, () => {
+const server = serve({ fetch: app.fetch, port: env.PORT }, () => {
   logger.info("service started", {
     port: env.PORT,
     baseUrl: `http://localhost:${env.PORT}`,
@@ -65,5 +66,7 @@ serve({ fetch: app.fetch, port: env.PORT }, () => {
   });
   logGatewayProxyRoutes();
 });
+
+registerGatewaySocketProxy(server);
 
 export default app;
