@@ -32,6 +32,7 @@ import {
 import {
   createSessionRoute,
   deleteSessionRoute,
+  emergencyUnlockSessionRoute,
   getSessionRoute,
   getSessionUsageRoute,
   listSessionLogsRoute,
@@ -58,6 +59,70 @@ const authMiddleware = createRequiredAuthSessionMiddleware({
 
 const createWalletLimitMessage = (available: number, requested: number) =>
   `User wallet limit reached. Available: ${available}, requested: ${requested}.`;
+
+registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
+  const body = c.req.valid("json");
+  const now = new Date();
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${body.podId}))`);
+
+    const session = await tx.query.podSessions.findFirst({
+      where: and(
+        eq(podSessions.podId, body.podId),
+        eq(podSessions.status, "CONFIRMED"),
+        eq(podSessions.isDeleted, false),
+        gt(podSessions.endAt, now)
+      ),
+      orderBy: (table, { asc }) => [asc(table.endAt)],
+      with: {
+        pod: {
+          with: {
+            location: true,
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      return null;
+    }
+
+    const [endedSession] = await tx
+      .update(podSessions)
+      .set({
+        status: "CANCELLED",
+        endAt: now,
+      })
+      .where(eq(podSessions.id, session.id))
+      .returning();
+
+    return {
+      session: endedSession ?? session,
+      location: session.pod?.location,
+    };
+  });
+
+  if (!result) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Active session not found for this OMMPod",
+      }),
+      404
+    );
+  }
+
+  await refreshPollingDataForPod(result.session.podId);
+
+  return c.json(
+    createSuccessResponse({
+      message: "Emergency unlock completed",
+      session: buildSessionResponse(result.session, now, result.location),
+    }),
+    200
+  );
+});
 
 sessionsGroup.use("*", authMiddleware);
 

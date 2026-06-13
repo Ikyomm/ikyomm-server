@@ -31,6 +31,15 @@ export const sessionCreateSchema = z.object({
 
 export const sessionCreateResponseSchema = sessionResponseSchema;
 
+export const sessionEmergencyUnlockSchema = z.object({
+  podId: z.string().trim().min(1),
+});
+
+export const sessionEmergencyUnlockResponseSchema = z.object({
+  message: z.string(),
+  session: sessionResponseSchema,
+});
+
 const tags = ["Sessions"];
 
 const sessionsRbac = createResourceRbacGuards({
@@ -199,6 +208,23 @@ export const createSessionRoute = createOpenApiRoute({
   },
   responses: {
     201: createApiSuccessResponse(sessionCreateResponseSchema, "Session created successfully"),
+  },
+});
+
+export const emergencyUnlockSessionRoute = createOpenApiRoute({
+  method: "post",
+  path: "/emergency-unlock",
+  operationId: "ommpodsSessionEmergencyUnlockByPod",
+  tags,
+  summary: "Emergency unlock the active session for an OMMPod",
+  request: {
+    body: createApiJsonBody(sessionEmergencyUnlockSchema),
+  },
+  responses: {
+    200: createApiSuccessResponse(
+      sessionEmergencyUnlockResponseSchema,
+      "Emergency unlock completed"
+    ),
   },
 });
 
