@@ -26,6 +26,7 @@ export const metadata = {
   adminSoftwareUrl: "https://admin.ikyomm.com",
   businessSoftwareUrl: "https://business.ommpods.com",
   mainpageUrl: "https://ommpods.com",
+  appUrl: "https://app.ikyomm.com",
   privacyPolicyUrl: "https://www.ommpods.app/privacy-policy-developer",
   termsAndConditionsUrl: "https://www.ommpods.app/terms-of-service",
   instagramUrl: "https://instagram.com",
@@ -43,6 +44,7 @@ export const emailPanelConfig: Record<
     websiteUrl: string;
     adminUrl: string;
     businessUrl: string;
+    appUrl: string;
     termsUrl: string;
     privacyPolicyUrl: string;
     accountLabel: string;
@@ -54,6 +56,7 @@ export const emailPanelConfig: Record<
     logoPath: imgesdata.ikyommLogoPath,
     websiteUrl: metadata.ikyomm,
     adminUrl: metadata.adminUrl,
+    appUrl: metadata.appUrl,
     businessUrl: metadata.businessUrl,
     termsUrl: metadata.termsAndConditionsUrl,
     privacyPolicyUrl: metadata.privacyPolicyUrl,
@@ -65,6 +68,7 @@ export const emailPanelConfig: Record<
     logoPath: imgesdata.ommpodsLogoPath,
     websiteUrl: metadata.ommpods,
     adminUrl: metadata.adminUrl,
+    appUrl: metadata.appUrl,
     businessUrl: metadata.businessUrl,
     termsUrl: metadata.termsAndConditionsUrl,
     privacyPolicyUrl: metadata.privacyPolicyUrl,

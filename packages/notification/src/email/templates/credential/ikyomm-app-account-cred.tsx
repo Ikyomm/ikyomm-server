@@ -47,7 +47,7 @@ export const IkyommAppAccountCredEmail = ({
   const getStartedLink = createCredentialAuthLink({
     credEmail,
     credPassword,
-    softwareUrl: brand.adminUrl,
+    softwareUrl: brand.appUrl,
   });
 
   return (
@@ -83,10 +83,7 @@ export const IkyommAppAccountCredEmail = ({
                     <Text className="font-14 font-inter text-fg-2 m-0">
                       Best Regards,
                       <br />
-                      <Link
-                        href={brand.websiteUrl}
-                        className="font-14 font-[700] text-brand underline"
-                      >
+                      <Link href={brand.appUrl} className="font-14 font-[700] text-brand underline">
                         {brand.teamName}
                       </Link>
                     </Text>
