@@ -29,6 +29,12 @@ export const sessionResponseSchema = z.object({
     totalTime: z.number().int().min(0),
     remaining: z.number().int().min(0),
   }),
+  sessionEndingDelay: z
+    .object({
+      totalTime: z.number().int().min(0),
+      remaining: z.number().int().min(0),
+    })
+    .nullable(),
 });
 
 export const activeSessionParamsSchema = z.object({
@@ -189,6 +195,21 @@ export function buildSessionStartingDelay(remaining = 0) {
   };
 }
 
+export function buildSessionEndingDelay(endAt: Date, now = new Date()) {
+  const totalTime = getSessionStartEndDelaySeconds();
+
+  if (totalTime <= 0 || now.getTime() < endAt.getTime()) {
+    return null;
+  }
+
+  const remaining = Math.min(
+    totalTime,
+    secondsUntil(new Date(endAt.getTime() + totalTime * 1000), now)
+  );
+
+  return remaining > 0 ? { totalTime, remaining } : null;
+}
+
 export function buildSessionResponse(
   session: typeof podSessions.$inferSelect,
   now = new Date(),
@@ -208,6 +229,7 @@ export function buildSessionResponse(
     start: formatDateTimeInTimeZone(session.startAt, timeZone),
     end: formatDateTimeInTimeZone(session.endAt, timeZone),
     ...timing,
+    sessionEndingDelay: buildSessionEndingDelay(session.endAt, now),
   };
 }
 

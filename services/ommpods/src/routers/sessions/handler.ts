@@ -16,7 +16,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { and, eq, gt, gte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import {
   fetchPodSessionList,
   fetchPodSessionLogList,
@@ -26,6 +26,7 @@ import {
   buildSessionResponse,
   buildSessionStartingDelay,
   findPodWithAromaDefuser,
+  getSessionStartEndDelaySeconds,
   getSessionStartingDelaySeconds,
 } from "../shared";
 import {
@@ -183,16 +184,17 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
         throw new Error("RATE_SLAB_NOT_FOUND");
       }
 
+      const sessionEndWindowStart = new Date(Date.now() - getSessionStartEndDelaySeconds() * 1000);
       const overlappingSession = await tx
         .select({ id: podSessions.id })
         .from(podSessions)
         .where(
           and(
             eq(podSessions.podId, body.podId),
-            eq(podSessions.status, "CONFIRMED"),
+            inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
             eq(podSessions.isDeleted, false),
-            // Future-start sessions are held reservations, so the start-delay window blocks rebooking.
-            gt(podSessions.endAt, new Date())
+            // Future-start sessions hold reservations; recently ended sessions hold the unlock delay.
+            gt(podSessions.endAt, sessionEndWindowStart)
           )
         )
         .limit(1)

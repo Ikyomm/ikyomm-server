@@ -1,9 +1,10 @@
 import { logger } from "@/lib/logger";
 import { db, podSessions } from "@ikyomm/database";
 import { getRedisClient } from "@ikyomm/utils";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import {
   DEFAULT_RGB,
+  buildSessionEndingDelay,
   buildSessionResponse,
   buildSessionStartingDelay,
   findPodWithAromaDefuser,
@@ -86,21 +87,6 @@ function getActiveDelay(
   return delay;
 }
 
-function buildSessionEndingDelay(endAt: Date, now: Date) {
-  const totalTime = getSessionStartEndDelaySeconds();
-
-  if (totalTime <= 0 || now.getTime() < endAt.getTime()) {
-    return null;
-  }
-
-  const remaining = Math.min(
-    totalTime,
-    secondsUntil(new Date(endAt.getTime() + totalTime * 1000), now)
-  );
-
-  return remaining > 0 ? { totalTime, remaining } : null;
-}
-
 function buildPollingSessionTiming(
   session: typeof podSessions.$inferSelect,
   now: Date,
@@ -123,7 +109,9 @@ function buildPollingSessionTiming(
   return {
     data: {
       session: sessionData,
-      sessionStartingDelay: getActiveDelay(sessionResponse.sessionStartingDelay),
+      sessionStartingDelay: sessionEndingDelay
+        ? null
+        : getActiveDelay(sessionResponse.sessionStartingDelay),
       sessionEndingDelay,
     },
     timing: {
@@ -173,14 +161,14 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
 
   const startsIn = secondsUntil(startAt, now);
   const remaining = startsIn > 0 ? secondsBetween(startAt, endAt) : secondsUntil(endAt, now);
+  const sessionEndingDelay = buildSessionEndingDelay(endAt, now);
   const sessionStartingDelay =
-    startsIn > 0
+    startsIn > 0 && !sessionEndingDelay
       ? getActiveDelay({
           totalTime: timing.startingDelayTotalTime,
           remaining: Math.min(timing.startingDelayTotalTime, startsIn),
         })
       : null;
-  const sessionEndingDelay = buildSessionEndingDelay(endAt, now);
 
   return {
     ...state.data,
@@ -320,7 +308,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   const session = await db.query.podSessions.findFirst({
     where: and(
       eq(podSessions.podId, pod.id),
-      eq(podSessions.status, "CONFIRMED"),
+      inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
       eq(podSessions.isDeleted, false),
       gt(podSessions.endAt, sessionEndWindowStart)
     ),
