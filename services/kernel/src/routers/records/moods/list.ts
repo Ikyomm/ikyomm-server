@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
 import { getDB, musicPlaylists, podMoodPresets } from "@ikyomm/database";
 import { createTableListFetcher } from "@ikyomm/utils";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { PodMoodPresetListQuery } from "./schema";
 
 const fetchPodMoodPresetBaseList = createTableListFetcher<
@@ -11,7 +11,13 @@ const fetchPodMoodPresetBaseList = createTableListFetcher<
 >({
   db: getDB,
   table: podMoodPresets,
-  where: ({ params }) => eq(podMoodPresets.isDeleted, params.isDeleted ?? false),
+  where: ({ params }) =>
+    and(
+      eq(podMoodPresets.isDeleted, params.isDeleted ?? false),
+      params.podType
+        ? sql`${params.podType}::ommpod_type = ANY(${podMoodPresets.enabledPodTypes})`
+        : undefined
+    ),
   search: {
     exact: [podMoodPresets.id],
     prefix: [podMoodPresets.title],

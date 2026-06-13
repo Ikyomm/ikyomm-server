@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { env } from "@/config/env";
+import { startAuthCrons } from "@/crons";
 import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
 
@@ -123,6 +124,7 @@ app.get("/docs", (c) => c.redirect("/api/auth/docs", 302));
 app.get("/", (c) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
+startAuthCrons({ logger });
 const authModulePromise = import("@/lib/auth");
 
 // Start expensive auth runtime initialization in background to reduce cold-start latency.

@@ -60,12 +60,12 @@ export const fetchOmmpodsAgentUserList = createTableListFetcher<
   joins: appUserListJoins,
   where: ({ params }) =>
     and(
-	      eq(user.panel, "app"),
-	      eq(user.isDeleted, params.isDeleted ?? false),
-	      params.excludeUserId ? ne(user.id, params.excludeUserId) : undefined,
-	      params.companyAssigned === true ? isNotNull(user.company) : undefined,
-	      params.companyAssigned === false ? isNull(user.company) : undefined
-	    ),
+      eq(user.panel, "app"),
+      eq(user.isDeleted, params.isDeleted ?? false),
+      params.excludeUserId ? ne(user.id, params.excludeUserId) : undefined,
+      params.companyAssigned === true ? isNotNull(user.company) : undefined,
+      params.companyAssigned === false ? isNull(user.company) : undefined
+    ),
   search: {
     exact: [user.id, user.company],
     prefix: [user.email, user.phoneNumber],

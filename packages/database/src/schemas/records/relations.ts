@@ -2,6 +2,8 @@ import { relations } from "drizzle-orm";
 import { organization, user } from "../auth";
 import { zoneLocation } from "../location";
 import { ikyommWallet, organizationWallet, userWallet, walletTransactions } from "../wallets";
+import { podSessionLogs, podSessions } from "../sessions";
+import { aromaDefusers } from "./devices/aroma-defusers";
 import { musicPlaylists, musics } from "./musics";
 import { pods } from "./pods";
 
@@ -9,6 +11,37 @@ export const podRelations = relations(pods, ({ one }) => ({
   location: one(zoneLocation, {
     fields: [pods.locationId],
     references: [zoneLocation.id],
+  }),
+  aromaDefuser: one(aromaDefusers, {
+    fields: [pods.aromaDefuserId],
+    references: [aromaDefusers.id],
+  }),
+}));
+
+export const aromaDefuserRelations = relations(aromaDefusers, ({ many }) => ({
+  pods: many(pods),
+}));
+
+export const podSessionRelations = relations(podSessions, ({ many, one }) => ({
+  pod: one(pods, {
+    fields: [podSessions.podId],
+    references: [pods.id],
+  }),
+  user: one(user, {
+    fields: [podSessions.userId],
+    references: [user.id],
+  }),
+  organization: one(organization, {
+    fields: [podSessions.companyId],
+    references: [organization.id],
+  }),
+  logs: many(podSessionLogs),
+}));
+
+export const podSessionLogRelations = relations(podSessionLogs, ({ one }) => ({
+  session: one(podSessions, {
+    fields: [podSessionLogs.sessionId],
+    references: [podSessions.id],
   }),
 }));
 

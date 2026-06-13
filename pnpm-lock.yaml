@@ -441,6 +441,52 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  services/ommpods:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^2.0.4
+        version: 2.0.4(hono@4.12.25)
+      '@hono/zod-openapi':
+        specifier: ^1.4.0
+        version: 1.4.0(hono@4.12.25)(zod@4.4.3)
+      '@ikyomm/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@ikyomm/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@ikyomm/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      '@t3-oss/env-core':
+        specifier: ^0.13.11
+        version: 0.13.11(typescript@6.0.3)(zod@4.4.3)
+      hono:
+        specifier: ^4.12.25
+        version: 4.12.25
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.4.16
+        version: 2.4.16
+      '@ikyomm/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^25.9.2
+        version: 25.9.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.10)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
 packages:
 
   '@asteasolutions/zod-to-openapi@8.5.0':

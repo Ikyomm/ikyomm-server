@@ -1,4 +1,4 @@
-import { podMoodPresets } from "@ikyomm/database";
+import { OmmPodType, podMoodPresets } from "@ikyomm/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
@@ -22,9 +22,12 @@ export const podMoodPresetColorSchema = z.object({
   gradient: z.string().trim().min(1),
 });
 
+export const podMoodPresetEnabledPodTypesSchema = z.array(z.enum(OmmPodType.enumValues)).min(1);
+
 export const podMoodPresetSchema = createDbSelectSchema(podMoodPresets).extend({
   rgb: podMoodPresetRgbSchema,
   color: podMoodPresetColorSchema,
+  enabledPodTypes: podMoodPresetEnabledPodTypesSchema,
   playlistIds: z.array(z.string().trim().min(1)),
   playlists: z
     .array(
@@ -42,6 +45,7 @@ const podMoodPresetCreateUpdateShape = {
   title: z.string().trim().min(1),
   thumbnail: z.string().trim().min(1),
   icon: z.string().trim().min(1),
+  enabledPodTypes: podMoodPresetEnabledPodTypesSchema.default([...OmmPodType.enumValues]),
   playlistIds: z.array(z.string().trim().min(1)).default([]),
   defaultMusic: z.string().trim().min(1),
 };
@@ -76,6 +80,7 @@ export const podMoodPresetUpdateSchema = createDbUpdateSchema(podMoodPresets, {
   title: z.string().trim().min(1).optional(),
   thumbnail: z.string().trim().min(1).optional(),
   icon: z.string().trim().min(1).optional(),
+  enabledPodTypes: podMoodPresetEnabledPodTypesSchema.optional(),
   playlistIds: z.array(z.string().trim().min(1)).optional(),
   defaultMusic: z.string().trim().min(1).optional(),
 });
@@ -91,6 +96,7 @@ export const podMoodPresetListSortFields = [
 export const podMoodPresetListQuerySchema = createListQuerySchema({
   sortFields: podMoodPresetListSortFields,
   extraShape: {
+    podType: z.enum(OmmPodType.enumValues).optional(),
     isDeleted: optionalBooleanQuerySchema,
   },
 });

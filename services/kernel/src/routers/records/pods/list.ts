@@ -1,11 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
-import {
-  getDB,
-  pods,
-  region,
-  zone,
-  zoneLocation,
-} from "@ikyomm/database";
+import { getDB, pods, region, zone, zoneLocation } from "@ikyomm/database";
 import { createTableListFetcher } from "@ikyomm/utils";
 import { eq } from "drizzle-orm";
 import type { PodListQuery } from "./schema";
@@ -82,14 +76,7 @@ export const fetchPodsList = createTableListFetcher<
   where: ({ params }) => eq(pods.isDeleted, params.isDeleted ?? false),
   search: {
     exact: [pods.id],
-    prefix: [
-      region.id,
-      region.name,
-      zone.id,
-      zone.name,
-      pods.locationId,
-      zoneLocation.name,
-    ],
+    prefix: [region.id, region.name, zone.id, zone.name, pods.locationId, zoneLocation.name],
     contains: [pods.name],
   },
   filterColumns: {

@@ -1,3 +1,4 @@
+export * from "./devices/aroma-defusers";
 export * from "./enums";
 export * from "./musics";
 export * from "./moods";

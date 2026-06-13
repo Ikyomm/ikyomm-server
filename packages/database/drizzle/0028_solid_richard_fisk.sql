@@ -1,0 +1,2 @@
+ALTER TABLE "pod_mood_presets" ADD COLUMN "enabled_pod_types" "ommpod_type"[] DEFAULT ARRAY['NEO', 'PRIMO', 'RESTORE', 'SIGNATURE']::ommpod_type[] NOT NULL;--> statement-breakpoint
+CREATE INDEX "pod_mood_presets_enabledPodTypes_idx" ON "pod_mood_presets" USING gin ("enabled_pod_types");

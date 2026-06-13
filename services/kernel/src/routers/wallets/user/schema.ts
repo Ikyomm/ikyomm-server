@@ -31,9 +31,7 @@ export const userWalletTransactionListQuerySchema = createListQuerySchema({
   },
 });
 
-export type UserWalletTransactionListQuery = z.infer<
-  typeof userWalletTransactionListQuerySchema
->;
+export type UserWalletTransactionListQuery = z.infer<typeof userWalletTransactionListQuerySchema>;
 
 export const userWalletTransactionListResponseSchema = createListResponseSchema(
   userWalletTransactionSchema

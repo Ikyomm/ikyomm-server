@@ -42,6 +42,14 @@ app.get(
         title: "Kernel Service",
         url: "/api/kernel/doc",
       },
+      {
+        title: "Company Service",
+        url: "/api/company/doc",
+      },
+      {
+        title: "Ommpods Service",
+        url: "/api/ommpods/doc",
+      },
     ],
   })
 );

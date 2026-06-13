@@ -13,6 +13,7 @@ import { create, get, list, permanentRemove, remove, restore, update } from "./o
 import {
   findNextPodId,
   findPodById,
+  validatePodAromaDefuserAssignment,
   validatePodLocationAssignment,
 } from "./utils";
 
@@ -54,6 +55,17 @@ registerOpenApiRoute(podsGroup, create, async (c) => {
       createErrorResponse({
         error: "Bad Request",
         message: locationValidation.message,
+      }),
+      400
+    );
+  }
+
+  const aromaDefuserValidation = await validatePodAromaDefuserAssignment(body);
+  if (!aromaDefuserValidation.valid) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: aromaDefuserValidation.message,
       }),
       400
     );
@@ -103,6 +115,20 @@ registerOpenApiRoute(podsGroup, update, async (c) => {
       createErrorResponse({
         error: "Bad Request",
         message: locationValidation.message,
+      }),
+      400
+    );
+  }
+
+  const aromaDefuserValidation = await validatePodAromaDefuserAssignment({
+    aromaDefuserId:
+      body.aromaDefuserId === undefined ? existingPod.aromaDefuserId : body.aromaDefuserId,
+  });
+  if (!aromaDefuserValidation.valid) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: aromaDefuserValidation.message,
       }),
       400
     );

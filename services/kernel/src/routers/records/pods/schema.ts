@@ -29,6 +29,11 @@ const assignmentSummarySchema = z.object({
   description: z.string().nullable(),
 });
 
+const aromaDefuserSummarySchema = z.object({
+  id: z.string(),
+  macId: z.string(),
+});
+
 export const podSchema = createDbSelectSchema(pods).extend({
   connectedDeviceConfig: connectedDeviceConfigSchema,
   rateConfig: z.preprocess((value) => value ?? [], rateConfigSchema),
@@ -37,6 +42,7 @@ export const podSchema = createDbSelectSchema(pods).extend({
   region: assignmentSummarySchema.nullable(),
   zone: assignmentSummarySchema.nullable(),
   location: assignmentSummarySchema.nullable(),
+  aromaDefuser: aromaDefuserSummarySchema.nullable().optional(),
 });
 
 export const podCreateSchema = createDbInsertSchema(pods, {
@@ -79,6 +85,7 @@ export const podListSortFields = [
   "regionId",
   "zoneId",
   "locationId",
+  "aromaDefuserId",
   "createdAt",
   "updatedAt",
 ] as const;
@@ -91,6 +98,7 @@ export const podListQuerySchema = createListQuerySchema({
     regionId: z.string().optional(),
     zoneId: z.string().optional(),
     locationId: z.string().optional(),
+    aromaDefuserId: z.string().optional(),
     isDeleted: optionalBooleanQuerySchema,
   },
 });

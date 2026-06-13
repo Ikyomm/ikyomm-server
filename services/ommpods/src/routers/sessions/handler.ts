@@ -1,0 +1,501 @@
+import type { AppBindings } from "@/types/app";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import {
+  db,
+  ikyommWallet,
+  organizationWallet,
+  podSessionLogs,
+  podSessions,
+  pods,
+  userWallet,
+  walletTransactions,
+} from "@ikyomm/database";
+import {
+  createErrorResponse,
+  createRequiredAuthSessionMiddleware,
+  createSuccessResponse,
+  generateRandomId,
+  getBetterAuthContext,
+  registerOpenApiRoute,
+} from "@ikyomm/utils";
+import { and, eq, gt, gte, sql } from "drizzle-orm";
+import {
+  fetchPodSessionList,
+  fetchPodSessionLogList,
+  fetchPodSessionTransactionList,
+} from "./list";
+import {
+  buildSessionResponse,
+  buildSessionStartingDelay,
+  findPodWithAromaDefuser,
+  getSessionStartingDelaySeconds,
+} from "../shared";
+import {
+  createSessionRoute,
+  deleteSessionRoute,
+  getSessionRoute,
+  getSessionUsageRoute,
+  listSessionLogsRoute,
+  listSessionsRoute,
+  listSessionTransactionsRoute,
+  permanentDeleteSessionRoute,
+  restoreSessionRoute,
+} from "./schema";
+import { findPodSessionById, getPodSessionUsage } from "./utils";
+import { refreshPollingDataForPod } from "../polling/state";
+
+export const sessionsGroup = new OpenAPIHono<AppBindings>();
+
+const authMiddleware = createRequiredAuthSessionMiddleware({
+  entities: {
+    user: true,
+    session: true,
+    data: false,
+    organization: false,
+    hasOrganization: false,
+  },
+  enableRedisCache: true,
+});
+
+const createWalletLimitMessage = (available: number, requested: number) =>
+  `User wallet limit reached. Available: ${available}, requested: ${requested}.`;
+
+sessionsGroup.use("*", authMiddleware);
+
+function getSessionPodId(session: Record<string, unknown>) {
+  return typeof session.podId === "string" ? session.podId : null;
+}
+
+registerOpenApiRoute(sessionsGroup, listSessionsRoute, async (c) => {
+  const query = c.req.valid("query");
+  const response = await fetchPodSessionList(query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, getSessionRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const session = await findPodSessionById(id, { includeDeleted: true });
+
+  if (!session) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(session), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, listSessionLogsRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const query = c.req.valid("query");
+  const session = await findPodSessionById(id, { includeDeleted: true });
+
+  if (!session) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  const response = await fetchPodSessionLogList(id, query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, listSessionTransactionsRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const query = c.req.valid("query");
+  const session = await findPodSessionById(id, { includeDeleted: true });
+
+  if (!session) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  const response = await fetchPodSessionTransactionList(id, query);
+
+  return c.json(createSuccessResponse(response), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, getSessionUsageRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const usage = await getPodSessionUsage(id);
+
+  if (!usage) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  return c.json(createSuccessResponse(usage), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
+  const body = c.req.valid("json");
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  if (!currentUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Unauthorized",
+        message: "Active session not found",
+      }),
+      401
+    );
+  }
+
+  const result = await db
+    .transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${body.podId}))`);
+
+      const pod = await tx.query.pods.findFirst({
+        where: and(eq(pods.id, body.podId), eq(pods.isDeleted, false)),
+      });
+
+      if (!pod) {
+        throw new Error("POD_NOT_FOUND");
+      }
+
+      if (pod.status !== "ACTIVE") {
+        throw new Error("POD_NOT_ACTIVE");
+      }
+
+      const selectedRateSlab = (pod.rateConfig ?? []).find(
+        (slab) => slab.minute === body.rateMinute
+      );
+
+      if (!selectedRateSlab) {
+        throw new Error("RATE_SLAB_NOT_FOUND");
+      }
+
+      const overlappingSession = await tx
+        .select({ id: podSessions.id })
+        .from(podSessions)
+        .where(
+          and(
+            eq(podSessions.podId, body.podId),
+            eq(podSessions.status, "CONFIRMED"),
+            eq(podSessions.isDeleted, false),
+            // Future-start sessions are held reservations, so the start-delay window blocks rebooking.
+            gt(podSessions.endAt, new Date())
+          )
+        )
+        .limit(1)
+        .then((rows) => rows[0]);
+
+      if (overlappingSession) {
+        throw new Error("POD_SESSION_CONFLICT");
+      }
+
+      const [sourceWallet] = await tx
+        .select()
+        .from(userWallet)
+        .where(and(eq(userWallet.userId, currentUser.id), eq(userWallet.isDeleted, false)))
+        .limit(1);
+
+      if (!sourceWallet) {
+        throw new Error("USER_WALLET_NOT_FOUND");
+      }
+
+      const companyId = currentUser.company ?? null;
+      const [destinationCompanyWallet] = companyId
+        ? await tx
+            .select()
+            .from(organizationWallet)
+            .where(
+              and(
+                eq(organizationWallet.organizationId, companyId),
+                eq(organizationWallet.isDeleted, false)
+              )
+            )
+            .limit(1)
+        : [undefined];
+      const [destinationIkyommWallet] = companyId
+        ? [undefined]
+        : await tx
+            .select()
+            .from(ikyommWallet)
+            .where(and(eq(ikyommWallet.singletonKey, "ikyomm"), eq(ikyommWallet.isDeleted, false)))
+            .limit(1);
+
+      if (companyId && !destinationCompanyWallet) {
+        throw new Error("COMPANY_WALLET_NOT_FOUND");
+      }
+
+      if (!companyId && !destinationIkyommWallet) {
+        throw new Error("IKYOMM_WALLET_NOT_FOUND");
+      }
+
+      const debitedWallets = await tx
+        .update(userWallet)
+        .set({
+          creditMinute: sql`${userWallet.creditMinute} - ${selectedRateSlab.credit}`,
+          updatedByUser: currentUser.id,
+        })
+        .where(
+          and(
+            eq(userWallet.id, sourceWallet.id),
+            gte(userWallet.creditMinute, selectedRateSlab.credit)
+          )
+        )
+        .returning({ id: userWallet.id });
+
+      if (debitedWallets.length === 0) {
+        throw new Error(
+          createWalletLimitMessage(sourceWallet.creditMinute, selectedRateSlab.credit)
+        );
+      }
+
+      if (destinationCompanyWallet) {
+        await tx
+          .update(organizationWallet)
+          .set({
+            creditMinute: sql`${organizationWallet.creditMinute} + ${selectedRateSlab.credit}`,
+            updatedByUser: currentUser.id,
+          })
+          .where(eq(organizationWallet.id, destinationCompanyWallet.id));
+      }
+
+      if (destinationIkyommWallet) {
+        await tx
+          .update(ikyommWallet)
+          .set({
+            creditMinute: sql`${ikyommWallet.creditMinute} + ${selectedRateSlab.credit}`,
+            updatedByUser: currentUser.id,
+          })
+          .where(eq(ikyommWallet.id, destinationIkyommWallet.id));
+      }
+
+      const now = new Date();
+      const startAt = new Date(now.getTime() + getSessionStartingDelaySeconds() * 1000);
+      const endAt = new Date(startAt.getTime() + selectedRateSlab.minute * 60_000);
+      const sessionId = generateRandomId();
+      const debitTransactionId = generateRandomId();
+      const creditTransactionId = generateRandomId();
+
+      await tx.insert(walletTransactions).values([
+        {
+          id: debitTransactionId,
+          type: "DEBIT",
+          status: "COMPLETED",
+          creditMinute: selectedRateSlab.credit,
+          reference: sessionId,
+          description: "Pod session credits debited from user wallet",
+          fromUserWalletId: sourceWallet.id,
+          toUserWalletId: sourceWallet.id,
+          createdByUser: currentUser.id,
+        },
+        {
+          id: creditTransactionId,
+          type: "CREDIT",
+          status: "COMPLETED",
+          creditMinute: selectedRateSlab.credit,
+          reference: sessionId,
+          description: companyId
+            ? "Pod session credits credited to company wallet"
+            : "Pod session credits credited to Ikyomm wallet",
+          fromOrganizationWalletId: destinationCompanyWallet?.id ?? null,
+          toOrganizationWalletId: destinationCompanyWallet?.id ?? null,
+          fromIkyommWalletId: destinationIkyommWallet?.id ?? null,
+          toIkyommWalletId: destinationIkyommWallet?.id ?? null,
+          createdByUser: currentUser.id,
+        },
+      ]);
+
+      const [session] = await tx
+        .insert(podSessions)
+        .values({
+          id: sessionId,
+          podId: body.podId,
+          userId: currentUser.id,
+          companyId,
+          startAt,
+          endAt,
+          createdByUser: currentUser.id,
+        })
+        .returning();
+
+      await tx.insert(podSessionLogs).values({
+        id: generateRandomId(),
+        sessionId,
+        eventType: "SESSION_CREATED",
+        payload: {
+          podId: body.podId,
+          rateMinute: selectedRateSlab.minute,
+          rateCredit: selectedRateSlab.credit,
+          sessionStartingDelay: buildSessionStartingDelay(getSessionStartingDelaySeconds()),
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        },
+        createdByUser: currentUser.id,
+      });
+
+      return session;
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+
+      if (
+        [
+          "POD_NOT_FOUND",
+          "POD_NOT_ACTIVE",
+          "RATE_SLAB_NOT_FOUND",
+          "POD_SESSION_CONFLICT",
+          "USER_WALLET_NOT_FOUND",
+          "COMPANY_WALLET_NOT_FOUND",
+          "IKYOMM_WALLET_NOT_FOUND",
+        ].includes(error.message) ||
+        error.message.includes("limit reached")
+      ) {
+        return error.message;
+      }
+
+      throw error;
+    });
+
+  if (typeof result === "string") {
+    const status =
+      result === "POD_NOT_FOUND" ||
+      result === "USER_WALLET_NOT_FOUND" ||
+      result === "COMPANY_WALLET_NOT_FOUND" ||
+      result === "IKYOMM_WALLET_NOT_FOUND"
+        ? 404
+        : result === "POD_SESSION_CONFLICT"
+          ? 409
+          : 400;
+    const messages: Record<string, string> = {
+      POD_NOT_FOUND: "Pod not found",
+      POD_NOT_ACTIVE: "Pod is not active",
+      RATE_SLAB_NOT_FOUND: "Selected rate slab not found for this Pod",
+      POD_SESSION_CONFLICT: "Pod already has an active or held session",
+      USER_WALLET_NOT_FOUND: "User wallet not found",
+      COMPANY_WALLET_NOT_FOUND: "Company wallet not found",
+      IKYOMM_WALLET_NOT_FOUND: "Ikyomm wallet not found",
+    };
+
+    return c.json(
+      createErrorResponse({
+        error: status === 409 ? "Conflict" : status === 404 ? "Not Found" : "Bad Request",
+        message: messages[result] ?? result,
+      }),
+      status
+    );
+  }
+
+  const responsePod = await findPodWithAromaDefuser(result.podId);
+  await refreshPollingDataForPod(result.podId);
+
+  return c.json(
+    createSuccessResponse(buildSessionResponse(result, new Date(), responsePod?.location)),
+    201
+  );
+});
+
+registerOpenApiRoute(sessionsGroup, deleteSessionRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  const existingSession = await findPodSessionById(id, { includeDeleted: true });
+  if (!existingSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  await db
+    .update(podSessions)
+    .set({
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedByUser: currentUser?.id ?? null,
+      updatedByUser: currentUser?.id ?? null,
+    })
+    .where(eq(podSessions.id, id));
+  const podId = getSessionPodId(existingSession);
+  if (podId) {
+    await refreshPollingDataForPod(podId);
+  }
+
+  return c.json(createSuccessResponse({ message: "Session deleted successfully" }), 200);
+});
+
+registerOpenApiRoute(sessionsGroup, permanentDeleteSessionRoute, async (c) => {
+  const { id } = c.req.valid("param");
+
+  const existingSession = await findPodSessionById(id, { includeDeleted: true });
+  if (!existingSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  await db.delete(podSessions).where(eq(podSessions.id, id));
+  const podId = getSessionPodId(existingSession);
+  if (podId) {
+    await refreshPollingDataForPod(podId);
+  }
+
+  return c.json(
+    createSuccessResponse({ message: "Session permanently deleted successfully" }),
+    200
+  );
+});
+
+registerOpenApiRoute(sessionsGroup, restoreSessionRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  const existingSession = await findPodSessionById(id, { includeDeleted: true });
+  if (!existingSession) {
+    return c.json(
+      createErrorResponse({
+        error: "Not Found",
+        message: "Session not found",
+      }),
+      404
+    );
+  }
+
+  await db
+    .update(podSessions)
+    .set({
+      isDeleted: false,
+      deletedAt: null,
+      deletedByUser: null,
+      updatedByUser: currentUser?.id ?? null,
+    })
+    .where(eq(podSessions.id, id));
+  const podId = getSessionPodId(existingSession);
+  if (podId) {
+    await refreshPollingDataForPod(podId);
+  }
+
+  return c.json(createSuccessResponse({ message: "Session restored successfully" }), 200);
+});

@@ -50,10 +50,7 @@ export async function findOmmpodsAgentUserById(id: string, options?: IncludeDele
     })
     .from(user)
     .leftJoin(organization, eq(organization.id, user.company))
-    .leftJoin(
-      userWallet,
-      and(eq(userWallet.userId, user.id), eq(userWallet.isDeleted, false))
-    )
+    .leftJoin(userWallet, and(eq(userWallet.userId, user.id), eq(userWallet.isDeleted, false)))
     .where(whereClause)
     .limit(1)
     .then((rows) => rows[0]);
@@ -80,7 +77,11 @@ export async function findActiveOrganizationById(id: string) {
     .select({ id: organization.id, name: organization.name })
     .from(organization)
     .where(
-      and(eq(organization.id, id), eq(organization.isDeleted, false), eq(organization.isActive, true))
+      and(
+        eq(organization.id, id),
+        eq(organization.isDeleted, false),
+        eq(organization.isActive, true)
+      )
     )
     .limit(1)
     .then((rows) => rows[0]);

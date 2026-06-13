@@ -1,3 +1,5 @@
+import type { OmmPodType } from "../enums";
+
 export type PodMoodPresetRgb = {
   r: number;
   g: number;
@@ -8,3 +10,5 @@ export type PodMoodPresetColor = {
   fixed: string;
   gradient: string;
 };
+
+export type PodMoodPresetEnabledPodTypes = OmmPodType[];

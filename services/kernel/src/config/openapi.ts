@@ -32,6 +32,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       description: "CRUD endpoints for Pods records.",
     },
     {
+      name: "Records / Aroma Defusers",
+      description: "CRUD endpoints for Aroma Defuser device records.",
+    },
+    {
       name: "Records / Mood Presets",
       description: "CRUD endpoints for Pod mood preset configuration records.",
     },
@@ -47,7 +51,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     },
     {
       name: "Records APIs",
-      tags: ["Records / Pods", "Records / Mood Presets"],
+      tags: ["Records / Pods", "Records / Aroma Defusers", "Records / Mood Presets"],
     },
   ],
   servers: [

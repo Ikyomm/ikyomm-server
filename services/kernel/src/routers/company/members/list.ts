@@ -50,7 +50,11 @@ export const fetchMemberList = createTableListFetcher<
     user,
   }),
   joins: memberListJoins,
-  where: and(eq(member.isDeleted, false), eq(user.isDeleted, false), eq(organization.isDeleted, false)),
+  where: and(
+    eq(member.isDeleted, false),
+    eq(user.isDeleted, false),
+    eq(organization.isDeleted, false)
+  ),
   search: {
     exact: [member.id, member.organizationId],
     prefix: [user.email, user.phoneNumber],

@@ -232,7 +232,11 @@ registerOpenApiRoute(ikyommAppUsersGroup, create, async (c) => {
 
         if (debitedWallets.length === 0) {
           throw new Error(
-            createWalletLimitMessage("Ikyomm wallet", sourceWallet.creditMinute, initialCreditMinute)
+            createWalletLimitMessage(
+              "Ikyomm wallet",
+              sourceWallet.creditMinute,
+              initialCreditMinute
+            )
           );
         }
       }

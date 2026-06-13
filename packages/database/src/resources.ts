@@ -1,5 +1,6 @@
 export const DATABASE_RESOURCES = {
   account: "account",
+  aroma_defuser: "aroma_defuser",
   app_user: "app_user",
   invitation: "invitation",
   member: "member",
@@ -8,6 +9,8 @@ export const DATABASE_RESOURCES = {
   musics: "musics",
   pod_mood_presets: "pod_mood_presets",
   pods: "pods",
+  pod_sessions: "pod_sessions",
+  pod_session_logs: "pod_session_logs",
   ikyomm_wallet: "ikyomm_wallet",
   organization: "organization",
   organization_wallet: "organization_wallet",

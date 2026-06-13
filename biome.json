@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
 
   "linter": {
     "enabled": true,
@@ -51,7 +51,8 @@
       "!**/node_modules",
       "!**/dist",
       "!**/.turbo",
-      "!**/coverage"
+      "!**/coverage",
+      "!packages/database/drizzle/meta/**/*.json"
     ]
   }
 }

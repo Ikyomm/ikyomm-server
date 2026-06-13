@@ -9,7 +9,7 @@
 - Drizzle ORM for PostgreSQL
 - Redis for auth secondary storage and rate limiting
 - Resend-backed notification package for email delivery
-- Multi-stage Docker builds for `gateway`, `auth`, `kernel`, and `company`
+- Multi-stage Docker builds for `gateway`, `auth`, `kernel`, `company`, and `ommpods`
 
 ## Active Services
 
@@ -20,6 +20,7 @@ Gateway entrypoint.
 - exposes gateway-local docs and health endpoints
 - proxies `/api/auth/*` to `auth`
 - proxies `/api/kernel/*` to `kernel`
+- proxies `/api/ommpods/*` to `ommpods`
 
 Key files:
 
@@ -54,6 +55,7 @@ Domain API service.
 - company CRUD and settings APIs
 - company member CRUD APIs
 - records APIs for Pods and devices
+- record-master APIs for Aroma Defusers, moods, music, playlists, and Pods
 - OpenAPI docs under `/api/kernel/doc` and `/api/kernel/docs`
 
 Key files:
@@ -77,6 +79,26 @@ Key files:
 - `services/company/src/config/openapi.ts`
 - `services/company/src/routers/company`
 
+### `services/ommpods`
+
+Live pod-session service.
+
+- exposed through gateway at `/api/ommpods`
+- books pod sessions from Pod rate slabs with wallet debit/credit handling
+- exposes public fast polling at `/api/ommpods/polling/pods/{podId}`
+- exposes session controls under `/api/ommpods/control`
+- stores session control changes as append-only `pod_session_logs`
+- mood changes log only `moodPresetId`; polling resolves RGB from the active mood preset
+- there is no separate RGB control API; RGB comes from the selected mood preset
+- aroma polling data is nested under `podData.aromaDufuser`
+
+Key files:
+
+- `services/ommpods/src/index.ts`
+- `services/ommpods/src/routers/sessions/handler.ts`
+- `services/ommpods/src/routers/control`
+- `services/ommpods/src/routers/polling/handler.ts`
+
 ## Kernel Router Layout
 
 Kernel router pattern should stay consistent:
@@ -89,6 +111,7 @@ Current kernel domains:
 
 - `services/kernel/src/routers/company/main`
 - `services/kernel/src/routers/company/members`
+- `services/kernel/src/routers/records/aroma-defusers`
 - `services/kernel/src/routers/records/pods`
 - `services/kernel/src/routers/records/devices`
 
@@ -105,36 +128,23 @@ Current API namespace:
 Implemented behavior:
 
 - list, get, create, update, soft delete
-- validates assigned `doorLockId`, `aromaDefuserId`, and `touchpadId`
-- prevents assigning the same device to multiple Pods
+- validates assigned `aromaDefuserId`
 - Pod ids use the existing sequential `generateNextOmmpodsId` helper
 
-### Devices
+### Aroma Defusers
 
-Backed by `packages/database/src/schemas/records/devices/schema.ts`.
+Backed by `packages/database/src/schemas/records/devices/aroma-defusers/schema.ts`.
 
 Current API namespace:
 
-- `/api/kernel/records/devices`
-
-Implemented device families:
-
-- `door-locks`
-- `aroma-defusers`
-- `touchpads`
+- `/api/kernel/records/aroma-defusers`
 
 Implemented behavior:
 
-- list, get, create, update, soft delete for all three device families
-- all three device tables now require `imei`
-- device read/update/delete routes accept either internal `id` or device `imei` in the `{identifier}` path param
-- device create/update payloads accept optional `ommpodId` for direct mapping, and `null` clears the mapping on update
-- device delete is blocked if the device is assigned to an active Pod
-- `door_lock` has extra `isLocked` and `status` fields
-- switch-route availability is controlled per device family from `buildDeviceRouteConfig(...)` options
-- `POST /api/kernel/records/devices/door-locks/{identifier}/switch` toggles `is_locked`
-- kernel docs group each device family under its own tag instead of one shared devices dropdown
-- Pod create/update no longer requires all device ids up front; device assignments are optional and can be attached later
+- list, get, create, update, soft delete, restore, permanent delete
+- `macId` is unique and indexed
+- `containers` is a JSON array of `{ number, fragrance }`
+- soft delete is blocked if an active Pod references the defuser
 
 ## Database Shape
 
@@ -147,7 +157,9 @@ Important schema groups:
 - `packages/database/src/schemas/auth`
   user, account, session, organization, member, invitation, RBAC
 - `packages/database/src/schemas/records`
-  pods, door_lock, aroma_defuser, touchpad, record enums, relations
+  pods, moods, musics, record enums, relations, devices/aroma-defusers
+- `packages/database/src/schemas/sessions`
+  pod_sessions, pod_session_logs, session enums, session log payload types
 
 Related files:
 
@@ -197,6 +209,7 @@ Current Docker setup is intentionally minimal and production-lean:
 - `docker/company.Dockerfile`
 - `docker/gateway.Dockerfile`
 - `docker/kernel.Dockerfile`
+- `docker/ommpods.Dockerfile`
 - `docker/docker-compose.yml`
 - `docker/docker-compose.prod.yml`
 
@@ -206,7 +219,7 @@ Pattern:
 - package-manifest-only dependency layer
 - distroless runtime image
 - compose healthchecks for runtime services must call `/nodejs/bin/node`, not bare `node`
-- `gateway` and `kernel` also need `REDIS_URL` in compose because shared rate-limit and Redis-backed utils are used outside auth
+- `gateway`, `kernel`, and `ommpods` also need `REDIS_URL` in compose because shared rate-limit and Redis-backed utils are used outside auth
 - avoid reintroducing full single-stage runtime images
 
 Useful commands:
@@ -241,9 +254,9 @@ pnpm docker:size
 - Keep gateway proxy config in sync with any new service path that should be reachable through `/api/*`.
 - Keep Dockerfiles on the current multi-stage minimal pattern; do not regress to full-repo single-stage images.
 - Do not invent new record namespaces when the schema already defines the domain naming.
-- `doorLock` is the only current device type with `isLocked`; toggle behavior should stay device-specific.
-- Shared RBAC resource definitions now include records resources such as `pods`, `door_lock`, `aroma_defuser`, and `touchpad`.
-- keep device `imei` indexed and treated like a first-class lookup key for CRUD-style routes
+- Shared RBAC resource definitions now include records/session resources such as `pods`, `aroma_defuser`, `pod_sessions`, and `pod_session_logs`.
+- keep Aroma Defuser `macId` indexed and treated like the hardware lookup key
+- Session live state belongs in `pod_session_logs`; keep `pod_sessions` focused on identity, pod/user/company refs, status, and time bounds.
 
 ## Maintenance Rule
 

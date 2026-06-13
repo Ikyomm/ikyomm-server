@@ -208,7 +208,8 @@ registerOpenApiRoute(ikyommWalletGroup, transferUserCredits, async (c) => {
           status: "COMPLETED",
           creditMinute: body.creditMinute,
           reference: body.reference ?? null,
-          description: body.description ?? "Credit minutes debited from Ikyomm wallet to user wallet",
+          description:
+            body.description ?? "Credit minutes debited from Ikyomm wallet to user wallet",
           fromIkyommWalletId: sourceWallet.id,
           toIkyommWalletId: sourceWallet.id,
           createdByUser: currentUser?.id ?? null,
@@ -219,7 +220,8 @@ registerOpenApiRoute(ikyommWalletGroup, transferUserCredits, async (c) => {
           status: "COMPLETED",
           creditMinute: body.creditMinute,
           reference: body.reference ?? null,
-          description: body.description ?? "Credit minutes credited to user wallet from Ikyomm wallet",
+          description:
+            body.description ?? "Credit minutes credited to user wallet from Ikyomm wallet",
           fromUserWalletId: destinationWallet.id,
           toUserWalletId: destinationWallet.id,
           createdByUser: currentUser?.id ?? null,

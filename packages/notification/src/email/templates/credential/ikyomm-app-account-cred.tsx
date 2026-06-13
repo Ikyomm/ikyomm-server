@@ -68,7 +68,8 @@ export const IkyommAppAccountCredEmail = ({
                     Hello{appUserName ? `, ${appUserName}` : ""},
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
-                    Your Ikyomm app account has been successfully created .
+                    Your Ikyomm app account has been successfully created as a{" "}
+                    <span className="font-semibold text-fg">{role?.toUpperCase()}</span>.
                   </Text>
                   <Text className="font-14 font-inter text-fg-2 m-0 mt-[10px]">
                     Here are your login credentials:
@@ -105,6 +106,5 @@ IkyommAppAccountCredEmail.PreviewProps = defaultData;
 
 export default IkyommAppAccountCredEmail;
 
-export const renderIkyommAppAccountCredEmail = async (
-  props: IkyommAppAccountCredEmailProps
-) => pretty(await render(<IkyommAppAccountCredEmail {...props} />));
+export const renderIkyommAppAccountCredEmail = async (props: IkyommAppAccountCredEmailProps) =>
+  pretty(await render(<IkyommAppAccountCredEmail {...props} />));

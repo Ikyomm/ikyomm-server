@@ -1,4 +1,4 @@
-import { db, pods, zoneLocation } from "@ikyomm/database";
+import { aromaDefusers, db, pods, zoneLocation } from "@ikyomm/database";
 import { generateNextOmmpodsId as generateNextPodsId } from "@ikyomm/utils";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -50,6 +50,7 @@ export async function findPodById(id: string, options?: IncludeDeletedOptions) {
           },
         },
       },
+      aromaDefuser: true,
     },
   });
 
@@ -81,6 +82,23 @@ export async function validatePodLocationAssignment(input: { locationId?: string
 
   if (input.locationId && !locationData) {
     return { valid: false as const, message: "Location not found" };
+  }
+
+  return { valid: true as const };
+}
+
+export async function validatePodAromaDefuserAssignment(input: { aromaDefuserId?: string | null }) {
+  const aromaDefuser = input.aromaDefuserId
+    ? await db
+        .select({ id: aromaDefusers.id })
+        .from(aromaDefusers)
+        .where(and(eq(aromaDefusers.id, input.aromaDefuserId), eq(aromaDefusers.isDeleted, false)))
+        .limit(1)
+        .then((rows) => rows[0])
+    : null;
+
+  if (input.aromaDefuserId && !aromaDefuser) {
+    return { valid: false as const, message: "Aroma Defuser not found" };
   }
 
   return { valid: true as const };
