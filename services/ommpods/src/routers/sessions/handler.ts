@@ -2,8 +2,6 @@ import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   db,
-  ikyommWallet,
-  organizationWallet,
   podSessionLogs,
   podSessions,
   pods,
@@ -215,33 +213,6 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
       }
 
       const companyId = currentUser.company ?? null;
-      const [destinationCompanyWallet] = companyId
-        ? await tx
-            .select()
-            .from(organizationWallet)
-            .where(
-              and(
-                eq(organizationWallet.organizationId, companyId),
-                eq(organizationWallet.isDeleted, false)
-              )
-            )
-            .limit(1)
-        : [undefined];
-      const [destinationIkyommWallet] = companyId
-        ? [undefined]
-        : await tx
-            .select()
-            .from(ikyommWallet)
-            .where(and(eq(ikyommWallet.singletonKey, "ikyomm"), eq(ikyommWallet.isDeleted, false)))
-            .limit(1);
-
-      if (companyId && !destinationCompanyWallet) {
-        throw new Error("COMPANY_WALLET_NOT_FOUND");
-      }
-
-      if (!companyId && !destinationIkyommWallet) {
-        throw new Error("IKYOMM_WALLET_NOT_FOUND");
-      }
 
       const debitedWallets = await tx
         .update(userWallet)
@@ -263,61 +234,23 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
         );
       }
 
-      if (destinationCompanyWallet) {
-        await tx
-          .update(organizationWallet)
-          .set({
-            creditMinute: sql`${organizationWallet.creditMinute} + ${selectedRateSlab.credit}`,
-            updatedByUser: currentUser.id,
-          })
-          .where(eq(organizationWallet.id, destinationCompanyWallet.id));
-      }
-
-      if (destinationIkyommWallet) {
-        await tx
-          .update(ikyommWallet)
-          .set({
-            creditMinute: sql`${ikyommWallet.creditMinute} + ${selectedRateSlab.credit}`,
-            updatedByUser: currentUser.id,
-          })
-          .where(eq(ikyommWallet.id, destinationIkyommWallet.id));
-      }
-
       const now = new Date();
       const startAt = new Date(now.getTime() + getSessionStartingDelaySeconds() * 1000);
       const endAt = new Date(startAt.getTime() + selectedRateSlab.minute * 60_000);
       const sessionId = generateRandomId();
       const debitTransactionId = generateRandomId();
-      const creditTransactionId = generateRandomId();
 
-      await tx.insert(walletTransactions).values([
-        {
-          id: debitTransactionId,
-          type: "DEBIT",
-          status: "COMPLETED",
-          creditMinute: selectedRateSlab.credit,
-          reference: sessionId,
-          description: "Pod session credits debited from user wallet",
-          fromUserWalletId: sourceWallet.id,
-          toUserWalletId: sourceWallet.id,
-          createdByUser: currentUser.id,
-        },
-        {
-          id: creditTransactionId,
-          type: "CREDIT",
-          status: "COMPLETED",
-          creditMinute: selectedRateSlab.credit,
-          reference: sessionId,
-          description: companyId
-            ? "Pod session credits credited to company wallet"
-            : "Pod session credits credited to Ikyomm wallet",
-          fromOrganizationWalletId: destinationCompanyWallet?.id ?? null,
-          toOrganizationWalletId: destinationCompanyWallet?.id ?? null,
-          fromIkyommWalletId: destinationIkyommWallet?.id ?? null,
-          toIkyommWalletId: destinationIkyommWallet?.id ?? null,
-          createdByUser: currentUser.id,
-        },
-      ]);
+      await tx.insert(walletTransactions).values({
+        id: debitTransactionId,
+        type: "DEBIT",
+        status: "COMPLETED",
+        creditMinute: selectedRateSlab.credit,
+        reference: sessionId,
+        description: "Pod session credits exhausted from user wallet",
+        fromUserWalletId: sourceWallet.id,
+        toUserWalletId: sourceWallet.id,
+        createdByUser: currentUser.id,
+      });
 
       const [session] = await tx
         .insert(podSessions)
@@ -361,8 +294,6 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
           "RATE_SLAB_NOT_FOUND",
           "POD_SESSION_CONFLICT",
           "USER_WALLET_NOT_FOUND",
-          "COMPANY_WALLET_NOT_FOUND",
-          "IKYOMM_WALLET_NOT_FOUND",
         ].includes(error.message) ||
         error.message.includes("limit reached")
       ) {
@@ -374,10 +305,7 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
 
   if (typeof result === "string") {
     const status =
-      result === "POD_NOT_FOUND" ||
-      result === "USER_WALLET_NOT_FOUND" ||
-      result === "COMPANY_WALLET_NOT_FOUND" ||
-      result === "IKYOMM_WALLET_NOT_FOUND"
+      result === "POD_NOT_FOUND" || result === "USER_WALLET_NOT_FOUND"
         ? 404
         : result === "POD_SESSION_CONFLICT"
           ? 409
@@ -388,8 +316,6 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
       RATE_SLAB_NOT_FOUND: "Selected rate slab not found for this Pod",
       POD_SESSION_CONFLICT: "Pod already has an active or held session",
       USER_WALLET_NOT_FOUND: "User wallet not found",
-      COMPANY_WALLET_NOT_FOUND: "Company wallet not found",
-      IKYOMM_WALLET_NOT_FOUND: "Ikyomm wallet not found",
     };
 
     return c.json(

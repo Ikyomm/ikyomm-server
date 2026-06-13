@@ -14,8 +14,8 @@ export const fetchAromaDefuserList = createTableListFetcher<
   where: ({ params }) => eq(aromaDefusers.isDeleted, params.isDeleted ?? false),
   search: {
     exact: [aromaDefusers.id, aromaDefusers.macId],
-    prefix: [aromaDefusers.macId],
-    contains: [aromaDefusers.macId],
+    prefix: [aromaDefusers.name, aromaDefusers.macId],
+    contains: [aromaDefusers.name, aromaDefusers.macId],
   },
   sorting: {
     defaultBy: "createdAt",
@@ -23,6 +23,7 @@ export const fetchAromaDefuserList = createTableListFetcher<
   },
   sortColumns: {
     id: aromaDefusers.id,
+    name: aromaDefusers.name,
     macId: aromaDefusers.macId,
     createdAt: aromaDefusers.createdAt,
     updatedAt: aromaDefusers.updatedAt,

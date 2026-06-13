@@ -31,10 +31,20 @@ const assignmentSummarySchema = z.object({
 
 const aromaDefuserSummarySchema = z.object({
   id: z.string(),
+  name: z.string().nullable().optional(),
   macId: z.string(),
+  containers: z
+    .array(
+      z.object({
+        number: z.number(),
+        fragrance: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export const podSchema = createDbSelectSchema(pods).extend({
+  aromaDefuserIds: z.array(z.string().trim().min(1)),
   connectedDeviceConfig: connectedDeviceConfigSchema,
   rateConfig: z.preprocess((value) => value ?? [], rateConfigSchema),
   regionId: z.string().nullable().optional(),
@@ -42,6 +52,7 @@ export const podSchema = createDbSelectSchema(pods).extend({
   region: assignmentSummarySchema.nullable(),
   zone: assignmentSummarySchema.nullable(),
   location: assignmentSummarySchema.nullable(),
+  aromaDefusers: z.array(aromaDefuserSummarySchema).optional(),
   aromaDefuser: aromaDefuserSummarySchema.nullable().optional(),
 });
 
@@ -57,6 +68,7 @@ export const podCreateSchema = createDbInsertSchema(pods, {
     "deletedByUser",
   ],
 }).extend({
+  aromaDefuserIds: z.array(z.string().trim().min(1)).default([]),
   connectedDeviceConfig: connectedDeviceConfigSchema.optional(),
   rateConfig: rateConfigSchema.optional(),
 });
@@ -73,6 +85,7 @@ export const podUpdateSchema = createDbUpdateSchema(pods, {
     "deletedByUser",
   ],
 }).extend({
+  aromaDefuserIds: z.array(z.string().trim().min(1)).optional(),
   connectedDeviceConfig: connectedDeviceConfigSchema.optional(),
   rateConfig: rateConfigSchema.optional(),
 });
@@ -85,7 +98,7 @@ export const podListSortFields = [
   "regionId",
   "zoneId",
   "locationId",
-  "aromaDefuserId",
+  "aromaDefuserIds",
   "createdAt",
   "updatedAt",
 ] as const;
@@ -99,6 +112,7 @@ export const podListQuerySchema = createListQuerySchema({
     zoneId: z.string().optional(),
     locationId: z.string().optional(),
     aromaDefuserId: z.string().optional(),
+    aromaDefuserIds: z.string().optional(),
     isDeleted: optionalBooleanQuerySchema,
   },
 });

@@ -18,6 +18,7 @@ import {
   getBetterAuthContext,
 } from "@ikyomm/utils";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { hydratePodAromaDefusers } from "../shared";
 
 export const appGroup = new OpenAPIHono<AppBindings>();
 
@@ -117,12 +118,10 @@ appGroup.get("/me", async (c) => {
 
 appGroup.get("/pods/:id", async (c) => {
   const podId = c.req.param("id");
-  const pod = await db.query.pods.findFirst({
+  const podRecord = await db.query.pods.findFirst({
     where: and(eq(pods.id, podId), eq(pods.isDeleted, false)),
-    with: {
-      aromaDefuser: true,
-    },
   });
+  const pod = await hydratePodAromaDefusers(podRecord);
 
   if (!pod) {
     return c.json(createErrorResponse({ error: "Not Found", message: "Pod not found" }), 404);
@@ -136,10 +135,17 @@ appGroup.get("/pods/:id", async (c) => {
       aromaDefuser: pod.aromaDefuser
         ? {
             id: pod.aromaDefuser.id,
+            name: pod.aromaDefuser.name,
             macId: pod.aromaDefuser.macId,
             containers: pod.aromaDefuser.containers ?? [],
           }
         : null,
+      aromaDefusers: (pod.aromaDefusers ?? []).map((aromaDefuser) => ({
+        id: aromaDefuser.id,
+        name: aromaDefuser.name,
+        macId: aromaDefuser.macId,
+        containers: aromaDefuser.containers ?? [],
+      })),
     }),
     200
   );

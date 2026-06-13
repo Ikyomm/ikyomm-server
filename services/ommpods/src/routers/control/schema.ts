@@ -11,9 +11,11 @@ export const moodControlResponseSchema = sessionResponseSchema.extend({
 });
 
 export const aromaControlBodySchema = z.object({
+  aromaDefuserId: z.string().trim().min(1).nullable().optional(),
   activeDufuserContainerNumber: z.coerce.number().int().positive().nullable(),
 });
 
 export const aromaControlResponseSchema = sessionResponseSchema.extend({
+  activeAromaDefuserId: z.string().nullable(),
   activeDufuserContainerNumber: z.number().int().positive().nullable(),
 });

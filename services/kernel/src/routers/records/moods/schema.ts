@@ -24,10 +24,18 @@ export const podMoodPresetColorSchema = z.object({
 
 export const podMoodPresetEnabledPodTypesSchema = z.array(z.enum(OmmPodType.enumValues)).min(1);
 
+export const podMoodPresetAromaDefuserContainersSchema = z.array(
+  z.object({
+    aromaDefuserId: z.string().trim().min(1),
+    containerNumbers: z.array(z.coerce.number().int().positive()).default([]),
+  })
+);
+
 export const podMoodPresetSchema = createDbSelectSchema(podMoodPresets).extend({
   rgb: podMoodPresetRgbSchema,
   color: podMoodPresetColorSchema,
   enabledPodTypes: podMoodPresetEnabledPodTypesSchema,
+  aromaDefuserContainers: podMoodPresetAromaDefuserContainersSchema,
   playlistIds: z.array(z.string().trim().min(1)),
   playlists: z
     .array(
@@ -46,6 +54,7 @@ const podMoodPresetCreateUpdateShape = {
   thumbnail: z.string().trim().min(1),
   icon: z.string().trim().min(1),
   enabledPodTypes: podMoodPresetEnabledPodTypesSchema.default([...OmmPodType.enumValues]),
+  aromaDefuserContainers: podMoodPresetAromaDefuserContainersSchema.default([]),
   playlistIds: z.array(z.string().trim().min(1)).default([]),
   defaultMusic: z.string().trim().min(1),
 };
@@ -81,6 +90,7 @@ export const podMoodPresetUpdateSchema = createDbUpdateSchema(podMoodPresets, {
   thumbnail: z.string().trim().min(1).optional(),
   icon: z.string().trim().min(1).optional(),
   enabledPodTypes: podMoodPresetEnabledPodTypesSchema.optional(),
+  aromaDefuserContainers: podMoodPresetAromaDefuserContainersSchema.optional(),
   playlistIds: z.array(z.string().trim().min(1)).optional(),
   defaultMusic: z.string().trim().min(1).optional(),
 });

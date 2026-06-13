@@ -9,7 +9,8 @@ export const pollingResponseSchema = z.object({
       })
     ),
     aromaDufuser: z.object({
-      defuserMacId: z.string().nullable(),
+      defuserMacIds: z.array(z.string()),
+      activeDefuserMacId: z.string().nullable(),
       activeDufuserContainerNumber: z.number().int().positive().nullable(),
     }),
   }),

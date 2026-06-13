@@ -12,3 +12,8 @@ export type PodMoodPresetColor = {
 };
 
 export type PodMoodPresetEnabledPodTypes = OmmPodType[];
+
+export type PodMoodPresetAromaDefuserContainer = {
+  aromaDefuserId: string;
+  containerNumbers: number[];
+};

@@ -50,7 +50,8 @@ export function buildSafePollingData(): PollingResponse {
     podData: {
       connectedDeviceConfig: [],
       aromaDufuser: {
-        defuserMacId: null,
+        defuserMacIds: [],
+        activeDefuserMacId: null,
         activeDufuserContainerNumber: null,
       },
     },
@@ -62,10 +63,14 @@ export function buildSafePollingData(): PollingResponse {
 }
 
 function buildBasePodData(pod: PodWithAromaDefuser | null | undefined): PollingResponse["podData"] {
+  const aromaDefusers = pod?.aromaDefusers ?? [];
+  const defuserMacIds = aromaDefusers.map((aromaDefuser) => aromaDefuser.macId);
+
   return {
     connectedDeviceConfig: pod?.connectedDeviceConfig ?? [],
     aromaDufuser: {
-      defuserMacId: pod?.aromaDefuser?.macId ?? null,
+      defuserMacIds,
+      activeDefuserMacId: null,
       activeDufuserContainerNumber: null,
     },
   };
@@ -155,6 +160,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
         ...state.data.podData,
         aromaDufuser: {
           ...state.data.podData.aromaDufuser,
+          activeDefuserMacId: null,
           activeDufuserContainerNumber: null,
         },
       },
@@ -337,11 +343,16 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   const controlState = await resolveSessionControlState(session.id);
   const rgb = controlState.rgb;
   const sessionResponse = buildPollingSessionTiming(session, now, pod);
+  const activeAromaDefuser =
+    pod.aromaDefusers.find(
+      (aromaDefuser) => aromaDefuser.id === controlState.activeAromaDefuserId
+    ) ?? null;
   const data = {
     podData: {
       ...basePodData,
       aromaDufuser: {
-        defuserMacId: pod.aromaDefuser?.macId ?? null,
+        ...basePodData.aromaDufuser,
+        activeDefuserMacId: activeAromaDefuser?.macId ?? null,
         activeDufuserContainerNumber: controlState.activeDufuserContainerNumber,
       },
     },

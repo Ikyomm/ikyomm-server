@@ -1,6 +1,6 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { db, musicPlaylists, podMoodPresets } from "@ikyomm/database";
+import { aromaDefusers, db, musicPlaylists, podMoodPresets } from "@ikyomm/database";
 import {
   createErrorResponse,
   createSuccessResponse,
@@ -8,7 +8,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fetchPodMoodPresetList } from "./list";
 import { create, get, list, permanentRemove, remove, restore, update } from "./openapi.route";
 import { findPodMoodPresetById, findPodMoodPresetByTitle } from "./utils";
@@ -41,6 +41,70 @@ async function validatePlaylistIds(playlistIds: string[]) {
   }
 
   return { ok: true as const, playlistIds: uniquePlaylistIds };
+}
+
+async function validateAromaDefuserContainers(
+  aromaDefuserContainers: { aromaDefuserId: string; containerNumbers: number[] }[] = []
+) {
+  const aromaDefuserIds = aromaDefuserContainers.map((item) => item.aromaDefuserId);
+  const uniqueAromaDefuserIds = [...new Set(aromaDefuserIds)];
+
+  if (uniqueAromaDefuserIds.length !== aromaDefuserIds.length) {
+    return { ok: false as const, message: "Aroma Defuser IDs must be unique" };
+  }
+
+  for (const item of aromaDefuserContainers) {
+    if (new Set(item.containerNumbers).size !== item.containerNumbers.length) {
+      return {
+        ok: false as const,
+        message: `Container numbers must be unique for Aroma Defuser ${item.aromaDefuserId}`,
+      };
+    }
+  }
+
+  if (uniqueAromaDefuserIds.length === 0) {
+    return { ok: true as const };
+  }
+
+  const existingAromaDefusers = await db
+    .select({
+      id: aromaDefusers.id,
+      containers: aromaDefusers.containers,
+    })
+    .from(aromaDefusers)
+    .where(
+      and(inArray(aromaDefusers.id, uniqueAromaDefuserIds), eq(aromaDefusers.isDeleted, false))
+    );
+  const aromaDefuserById = new Map(
+    existingAromaDefusers.map((aromaDefuser) => [aromaDefuser.id, aromaDefuser])
+  );
+  const missingAromaDefuserIds = uniqueAromaDefuserIds.filter((id) => !aromaDefuserById.has(id));
+
+  if (missingAromaDefuserIds.length > 0) {
+    return {
+      ok: false as const,
+      message: `Aroma Defuser not found: ${missingAromaDefuserIds.join(", ")}`,
+    };
+  }
+
+  for (const item of aromaDefuserContainers) {
+    const aromaDefuser = aromaDefuserById.get(item.aromaDefuserId);
+    const allowedContainerNumbers = new Set(
+      (aromaDefuser?.containers ?? []).map((container) => container.number)
+    );
+    const missingContainerNumbers = item.containerNumbers.filter(
+      (containerNumber) => !allowedContainerNumbers.has(containerNumber)
+    );
+
+    if (missingContainerNumbers.length > 0) {
+      return {
+        ok: false as const,
+        message: `Container number not found for Aroma Defuser ${item.aromaDefuserId}: ${missingContainerNumbers.join(", ")}`,
+      };
+    }
+  }
+
+  return { ok: true as const };
 }
 
 registerOpenApiRoute(moodPresetsGroup, list, async (c) => {
@@ -89,6 +153,17 @@ registerOpenApiRoute(moodPresetsGroup, create, async (c) => {
         message: `Music playlist not found: ${playlistValidation.missingPlaylistIds.join(", ")}`,
       }),
       404
+    );
+  }
+
+  const aromaValidation = await validateAromaDefuserContainers(body.aromaDefuserContainers);
+  if (!aromaValidation.ok) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: aromaValidation.message,
+      }),
+      400
     );
   }
 
@@ -145,6 +220,19 @@ registerOpenApiRoute(moodPresetsGroup, update, async (c) => {
     }
 
     playlistIds = playlistValidation.playlistIds;
+  }
+
+  if (body.aromaDefuserContainers) {
+    const aromaValidation = await validateAromaDefuserContainers(body.aromaDefuserContainers);
+    if (!aromaValidation.ok) {
+      return c.json(
+        createErrorResponse({
+          error: "Bad Request",
+          message: aromaValidation.message,
+        }),
+        400
+      );
+    }
   }
 
   const [moodPreset] = await db

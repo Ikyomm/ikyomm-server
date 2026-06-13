@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { env } from "@/config/env";
 import {
+  aromaDefusers,
   db,
   podMoodPresets,
   podSessionLogs,
@@ -9,8 +10,7 @@ import {
   type PodSessionRgb,
 } from "@ikyomm/database";
 import type { zoneLocation } from "@ikyomm/database";
-import type { aromaDefusers } from "@ikyomm/database";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
 
 export const rgbSchema = z.object({
   r: z.number().int().min(0).max(255),
@@ -40,6 +40,11 @@ export const messageResponseSchema = z.object({
 });
 
 export const DEFAULT_RGB: PodSessionRgb = { r: 255, g: 255, b: 255 };
+type AromaDefuserRecord = typeof aromaDefusers.$inferSelect;
+type HydratedAromaPod<TPod extends Record<string, unknown>> = TPod & {
+  aromaDefusers: AromaDefuserRecord[];
+  aromaDefuser: AromaDefuserRecord | null;
+};
 
 type PodLocationTimeZoneInput =
   | Pick<typeof zoneLocation.$inferSelect, "name" | "address" | "latitude" | "longitude">
@@ -207,7 +212,7 @@ export function buildSessionResponse(
 }
 
 export async function findActiveSessionForUser(sessionId: string, userId: string) {
-  return db.query.podSessions.findFirst({
+  const session = await db.query.podSessions.findFirst({
     where: and(
       eq(podSessions.id, sessionId),
       eq(podSessions.userId, userId),
@@ -218,22 +223,67 @@ export async function findActiveSessionForUser(sessionId: string, userId: string
     with: {
       pod: {
         with: {
-          aromaDefuser: true,
           location: true,
         },
       },
     },
   });
+
+  if (!session?.pod) {
+    return session;
+  }
+
+  return {
+    ...session,
+    pod: await hydratePodAromaDefusers(session.pod),
+  };
 }
 
 export async function findPodWithAromaDefuser(podId: string) {
-  return db.query.pods.findFirst({
+  const pod = await db.query.pods.findFirst({
     where: and(eq(pods.id, podId), eq(pods.isDeleted, false)),
     with: {
-      aromaDefuser: true,
       location: true,
     },
   });
+
+  return hydratePodAromaDefusers(pod);
+}
+
+export async function findAromaDefusersByIds(aromaDefuserIds: string[] = []) {
+  const uniqueIds = [...new Set(aromaDefuserIds.filter(Boolean))];
+
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select()
+    .from(aromaDefusers)
+    .where(and(inArray(aromaDefusers.id, uniqueIds), eq(aromaDefusers.isDeleted, false)));
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+
+  return uniqueIds
+    .map((id) => rowById.get(id))
+    .filter((row): row is (typeof rows)[number] => Boolean(row));
+}
+
+export async function hydratePodAromaDefusers<TPod extends Record<string, unknown>>(
+  pod: TPod | null | undefined
+): Promise<HydratedAromaPod<TPod> | null | undefined> {
+  if (!pod) {
+    return pod;
+  }
+
+  const aromaDefusersList = await findAromaDefusersByIds(
+    Array.isArray(pod.aromaDefuserIds) ? (pod.aromaDefuserIds as string[]) : []
+  );
+
+  return {
+    ...pod,
+    aromaDefusers: aromaDefusersList,
+    aromaDefuser: aromaDefusersList[0] ?? null,
+  };
 }
 
 export function findContainer(
@@ -254,6 +304,15 @@ function getAromaContainerFromPayload(payload: unknown) {
 
   const value = payload.activeDufuserContainerNumber;
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function getAromaDefuserIdFromPayload(payload: unknown) {
+  if (!isObject(payload)) {
+    return null;
+  }
+
+  const value = payload.activeAromaDefuserId;
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 export async function resolveSessionControlState(sessionId: string) {
@@ -310,6 +369,7 @@ export async function resolveSessionControlState(sessionId: string) {
   return {
     rgb: moodPreset?.rgb ?? DEFAULT_RGB,
     moodPresetId: moodPreset?.id ?? null,
+    activeAromaDefuserId: getAromaDefuserIdFromPayload(latestAromaLog?.payload),
     activeDufuserContainerNumber: getAromaContainerFromPayload(latestAromaLog?.payload),
   };
 }

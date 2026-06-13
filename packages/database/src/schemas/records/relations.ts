@@ -3,7 +3,6 @@ import { organization, user } from "../auth";
 import { zoneLocation } from "../location";
 import { ikyommWallet, organizationWallet, userWallet, walletTransactions } from "../wallets";
 import { podSessionLogs, podSessions } from "../sessions";
-import { aromaDefusers } from "./devices/aroma-defusers";
 import { musicPlaylists, musics } from "./musics";
 import { pods } from "./pods";
 
@@ -12,14 +11,6 @@ export const podRelations = relations(pods, ({ one }) => ({
     fields: [pods.locationId],
     references: [zoneLocation.id],
   }),
-  aromaDefuser: one(aromaDefusers, {
-    fields: [pods.aromaDefuserId],
-    references: [aromaDefusers.id],
-  }),
-}));
-
-export const aromaDefuserRelations = relations(aromaDefusers, ({ many }) => ({
-  pods: many(pods),
 }));
 
 export const podSessionRelations = relations(podSessions, ({ many, one }) => ({

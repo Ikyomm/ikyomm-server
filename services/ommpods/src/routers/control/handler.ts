@@ -140,9 +140,21 @@ registerOpenApiRoute(controlGroup, updateAromaRoute, async (c) => {
     );
   }
 
+  const aromaDefusers =
+    (
+      session.pod as {
+        aromaDefusers?: Parameters<typeof getAromaValidationError>[0]["aromaDefusers"];
+      }
+    )?.aromaDefusers ?? [];
+  const activeAromaDefuserId =
+    body.activeDufuserContainerNumber === null
+      ? null
+      : (body.aromaDefuserId ?? aromaDefusers[0]?.id ?? null);
+
   const validationError = getAromaValidationError({
-    aromaDefuser: session.pod?.aromaDefuser ?? null,
-    activeDufuserContainerNumber: body.activeDufuserContainerNumber,
+    aromaDefusers,
+    aromaDefuserId: activeAromaDefuserId,
+    containerNumber: body.activeDufuserContainerNumber,
   });
   if (validationError) {
     return c.json(createErrorResponse({ error: "Bad Request", message: validationError }), 400);
@@ -152,6 +164,7 @@ registerOpenApiRoute(controlGroup, updateAromaRoute, async (c) => {
     sessionId,
     eventType: "AROMA_CHANGED",
     payload: {
+      activeAromaDefuserId,
       activeDufuserContainerNumber: body.activeDufuserContainerNumber,
     },
     createdByUser: currentUser.id,
@@ -161,6 +174,7 @@ registerOpenApiRoute(controlGroup, updateAromaRoute, async (c) => {
   return c.json(
     createSuccessResponse({
       ...buildSessionResponse(session, new Date(), session.pod?.location),
+      activeAromaDefuserId,
       activeDufuserContainerNumber: body.activeDufuserContainerNumber,
     }),
     200

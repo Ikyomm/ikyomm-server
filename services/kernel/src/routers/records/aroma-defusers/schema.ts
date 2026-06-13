@@ -21,6 +21,7 @@ export const aromaDefuserSchema = createDbSelectSchema(aromaDefusers).extend({
 });
 
 const aromaDefuserCreateUpdateShape = {
+  name: z.string().trim().min(1).nullable().optional(),
   macId: z.string().trim().min(1),
   containers: aromaDefuserContainersSchema.default([]),
 };
@@ -50,11 +51,18 @@ export const aromaDefuserUpdateSchema = createDbUpdateSchema(aromaDefusers, {
     "deletedByUser",
   ],
 }).extend({
+  name: z.string().trim().min(1).nullable().optional(),
   macId: z.string().trim().min(1).optional(),
   containers: aromaDefuserContainersSchema.optional(),
 });
 
-export const aromaDefuserListSortFields = ["id", "macId", "createdAt", "updatedAt"] as const;
+export const aromaDefuserListSortFields = [
+  "id",
+  "name",
+  "macId",
+  "createdAt",
+  "updatedAt",
+] as const;
 
 export const aromaDefuserListQuerySchema = createListQuerySchema({
   sortFields: aromaDefuserListSortFields,

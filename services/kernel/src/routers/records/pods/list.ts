@@ -1,8 +1,9 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Drizzle query builders are intentionally passed through reusable helpers. */
 import { getDB, pods, region, zone, zoneLocation } from "@ikyomm/database";
 import { createTableListFetcher } from "@ikyomm/utils";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { PodListQuery } from "./schema";
+import { findAromaDefusersByIds } from "./utils";
 
 function podListJoins(queryBuilder: any) {
   return queryBuilder
@@ -53,7 +54,7 @@ function mapPodListItem(row: Record<string, unknown>) {
   };
 }
 
-export const fetchPodsList = createTableListFetcher<
+const fetchPodsBaseList = createTableListFetcher<
   typeof pods,
   ReturnType<typeof mapPodListItem>,
   PodListQuery
@@ -73,7 +74,16 @@ export const fetchPodsList = createTableListFetcher<
     locationDescription: zoneLocation.description,
   }),
   joins: podListJoins,
-  where: ({ params }) => eq(pods.isDeleted, params.isDeleted ?? false),
+  where: ({ params }) =>
+    and(
+      eq(pods.isDeleted, params.isDeleted ?? false),
+      params.aromaDefuserId
+        ? sql`${pods.aromaDefuserIds} @> ${JSON.stringify([params.aromaDefuserId])}::jsonb`
+        : undefined,
+      params.aromaDefuserIds
+        ? sql`${pods.aromaDefuserIds} @> ${JSON.stringify([params.aromaDefuserIds])}::jsonb`
+        : undefined
+    ),
   search: {
     exact: [pods.id],
     prefix: [region.id, region.name, zone.id, zone.name, pods.locationId, zoneLocation.name],
@@ -106,3 +116,37 @@ export const fetchPodsList = createTableListFetcher<
   },
   mapItem: mapPodListItem,
 });
+
+export const fetchPodsList = async (params: PodListQuery) => {
+  const response = await fetchPodsBaseList(params);
+  const aromaDefuserIds = [
+    ...new Set(
+      response.items.flatMap(
+        (pod) => ((pod as Record<string, unknown>).aromaDefuserIds as string[] | undefined) ?? []
+      )
+    ),
+  ];
+  const aromaDefusers = await findAromaDefusersByIds(aromaDefuserIds);
+  const aromaDefuserById = new Map(
+    aromaDefusers.map((aromaDefuser) => [aromaDefuser.id, aromaDefuser])
+  );
+
+  return {
+    ...response,
+    items: response.items.map((pod) => {
+      const podAromaDefusers = (
+        ((pod as Record<string, unknown>).aromaDefuserIds as string[] | undefined) ?? []
+      )
+        .map((id) => aromaDefuserById.get(id))
+        .filter((aromaDefuser): aromaDefuser is (typeof aromaDefusers)[number] =>
+          Boolean(aromaDefuser)
+        );
+
+      return {
+        ...pod,
+        aromaDefusers: podAromaDefusers,
+        aromaDefuser: podAromaDefusers[0] ?? null,
+      };
+    }),
+  };
+};

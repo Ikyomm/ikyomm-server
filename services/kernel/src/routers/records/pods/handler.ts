@@ -121,8 +121,8 @@ registerOpenApiRoute(podsGroup, update, async (c) => {
   }
 
   const aromaDefuserValidation = await validatePodAromaDefuserAssignment({
-    aromaDefuserId:
-      body.aromaDefuserId === undefined ? existingPod.aromaDefuserId : body.aromaDefuserId,
+    aromaDefuserIds:
+      body.aromaDefuserIds === undefined ? existingPod.aromaDefuserIds : body.aromaDefuserIds,
   });
   if (!aromaDefuserValidation.valid) {
     return c.json(

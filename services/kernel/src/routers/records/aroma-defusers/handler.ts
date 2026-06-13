@@ -8,7 +8,7 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { fetchAromaDefuserList } from "./list";
 import { create, get, list, permanentRemove, remove, restore, update } from "./openapi.route";
 import { findAromaDefuserById, findAromaDefuserByMacId } from "./utils";
@@ -145,7 +145,9 @@ registerOpenApiRoute(aromaDefusersGroup, remove, async (c) => {
   const assignedPod = await db
     .select({ id: pods.id })
     .from(pods)
-    .where(and(eq(pods.aromaDefuserId, id), eq(pods.isDeleted, false)))
+    .where(
+      and(eq(pods.isDeleted, false), sql`${pods.aromaDefuserIds} @> ${JSON.stringify([id])}::jsonb`)
+    )
     .limit(1)
     .then((rows) => rows[0]);
 

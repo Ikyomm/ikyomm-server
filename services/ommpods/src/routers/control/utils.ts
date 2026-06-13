@@ -17,18 +17,25 @@ export async function findActiveMoodPreset(moodPresetId: string) {
 }
 
 export function getAromaValidationError(input: {
-  aromaDefuser: Parameters<typeof findContainer>[0];
-  activeDufuserContainerNumber: number | null;
+  aromaDefusers: NonNullable<Parameters<typeof findContainer>[0]>[];
+  aromaDefuserId: string | null;
+  containerNumber: number | null;
 }) {
-  if (input.activeDufuserContainerNumber === null) {
+  if (input.containerNumber === null) {
     return null;
   }
 
-  if (!input.aromaDefuser) {
+  if (input.aromaDefusers.length === 0) {
     return "Pod does not have an Aroma Defuser assigned";
   }
 
-  if (!findContainer(input.aromaDefuser, input.activeDufuserContainerNumber)) {
+  const aromaDefuser = input.aromaDefusers.find((item) => item.id === input.aromaDefuserId);
+
+  if (!aromaDefuser) {
+    return "Aroma Defuser is not assigned to this Pod";
+  }
+
+  if (!findContainer(aromaDefuser, input.containerNumber)) {
     return "Aroma Defuser container number not found";
   }
 
