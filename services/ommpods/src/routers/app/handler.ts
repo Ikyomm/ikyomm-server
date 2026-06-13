@@ -7,6 +7,7 @@ import {
   musics,
   organization,
   podMoodPresets,
+  podSessions,
   pods,
   userWallet,
   walletTransactions,
@@ -17,8 +18,8 @@ import {
   createSuccessResponse,
   getBetterAuthContext,
 } from "@ikyomm/utils";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { hydratePodAromaDefusers } from "../shared";
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { buildSessionResponse, hydratePodAromaDefusers } from "../shared";
 
 export const appGroup = new OpenAPIHono<AppBindings>();
 
@@ -34,6 +35,41 @@ const appAuthMiddleware = createRequiredAuthSessionMiddleware({
 });
 
 appGroup.use("*", appAuthMiddleware);
+
+type AppAromaDefuser = {
+  id: string;
+  name: string | null;
+  macId: string;
+  containers?: unknown[] | null;
+};
+
+type AppPod = typeof pods.$inferSelect & {
+  location?: unknown;
+  aromaDefuser: AppAromaDefuser | null;
+  aromaDefusers: AppAromaDefuser[];
+};
+
+function serializeAppPod(pod: AppPod) {
+  return {
+    ...pod,
+    rateConfig: pod.rateConfig ?? [],
+    connectedDeviceConfig: pod.connectedDeviceConfig ?? [],
+    aromaDefuser: pod.aromaDefuser
+      ? {
+          id: pod.aromaDefuser.id,
+          name: pod.aromaDefuser.name,
+          macId: pod.aromaDefuser.macId,
+          containers: pod.aromaDefuser.containers ?? [],
+        }
+      : null,
+    aromaDefusers: (pod.aromaDefusers ?? []).map((aromaDefuser) => ({
+      id: aromaDefuser.id,
+      name: aromaDefuser.name,
+      macId: aromaDefuser.macId,
+      containers: aromaDefuser.containers ?? [],
+    })),
+  };
+}
 
 appGroup.get("/me", async (c) => {
   const { user: currentUser } = getBetterAuthContext(c);
@@ -117,6 +153,49 @@ appGroup.get("/me", async (c) => {
   );
 });
 
+appGroup.get("/sessions/active", async (c) => {
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  if (!currentUser) {
+    return c.json(
+      createErrorResponse({ error: "Unauthorized", message: "Active session not found" }),
+      401
+    );
+  }
+
+  const now = new Date();
+  const session = await db.query.podSessions.findFirst({
+    where: and(
+      eq(podSessions.userId, currentUser.id),
+      eq(podSessions.status, "CONFIRMED"),
+      eq(podSessions.isDeleted, false),
+      gt(podSessions.endAt, now)
+    ),
+    orderBy: (table, { asc }) => [asc(table.endAt)],
+    with: {
+      pod: {
+        with: {
+          location: true,
+        },
+      },
+    },
+  });
+
+  const pod = await hydratePodAromaDefusers(session?.pod);
+
+  if (!(session && pod)) {
+    return c.json(createSuccessResponse(null), 200);
+  }
+
+  return c.json(
+    createSuccessResponse({
+      session: buildSessionResponse(session, now, pod.location),
+      pod: serializeAppPod(pod),
+    }),
+    200
+  );
+});
+
 appGroup.get("/pods/:id", async (c) => {
   const podId = c.req.param("id");
   const podRecord = await db.query.pods.findFirst({
@@ -128,28 +207,7 @@ appGroup.get("/pods/:id", async (c) => {
     return c.json(createErrorResponse({ error: "Not Found", message: "Pod not found" }), 404);
   }
 
-  return c.json(
-    createSuccessResponse({
-      ...pod,
-      rateConfig: pod.rateConfig ?? [],
-      connectedDeviceConfig: pod.connectedDeviceConfig ?? [],
-      aromaDefuser: pod.aromaDefuser
-        ? {
-            id: pod.aromaDefuser.id,
-            name: pod.aromaDefuser.name,
-            macId: pod.aromaDefuser.macId,
-            containers: pod.aromaDefuser.containers ?? [],
-          }
-        : null,
-      aromaDefusers: (pod.aromaDefusers ?? []).map((aromaDefuser) => ({
-        id: aromaDefuser.id,
-        name: aromaDefuser.name,
-        macId: aromaDefuser.macId,
-        containers: aromaDefuser.containers ?? [],
-      })),
-    }),
-    200
-  );
+  return c.json(createSuccessResponse(serializeAppPod(pod)), 200);
 });
 
 appGroup.get("/moods/list", async (c) => {
