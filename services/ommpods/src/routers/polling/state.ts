@@ -3,7 +3,6 @@ import { db, podSessions } from "@ikyomm/database";
 import { getRedisClient } from "@ikyomm/utils";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import {
-  DEFAULT_RGB,
   buildSessionEndingDelay,
   buildSessionResponse,
   buildSessionStartingDelay,
@@ -21,6 +20,8 @@ const POLLING_REDIS_VERSION = 1;
 const NO_SESSION_REDIS_TTL_SECONDS = 5;
 const EXPIRED_SESSION_REDIS_TTL_SECONDS = 5;
 const SESSION_REDIS_GRACE_SECONDS = 60;
+const POLLING_IDLE_RGB = { r: 0, g: 0, b: 0 };
+const POLLING_DELAY_RGB = { r: 255, g: 255, b: 255 };
 
 type PodWithAromaDefuser = Awaited<ReturnType<typeof findPodWithAromaDefuser>>;
 type PollingStateUpdateListener = (podId: string, data: PollingResponse) => void;
@@ -71,6 +72,24 @@ function notifyPollingStateUpdated(podId: string, data: PollingResponse) {
   }
 }
 
+function applyPollingRgbState(data: PollingResponse): PollingResponse {
+  if (data.sessionStartingDelay || data.sessionEndingDelay) {
+    return {
+      ...data,
+      ...POLLING_DELAY_RGB,
+    };
+  }
+
+  if (!data.session) {
+    return {
+      ...data,
+      ...POLLING_IDLE_RGB,
+    };
+  }
+
+  return data;
+}
+
 export function buildSafePollingData(): PollingResponse {
   return {
     podData: {
@@ -81,7 +100,7 @@ export function buildSafePollingData(): PollingResponse {
         activeDufuserContainerNumber: null,
       },
     },
-    ...DEFAULT_RGB,
+    ...POLLING_IDLE_RGB,
     sessionStartingDelay: null,
     sessionEndingDelay: null,
     session: null,
@@ -156,7 +175,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
   const timing = state.sessionTiming;
 
   if (!timing) {
-    return state.data;
+    return applyPollingRgbState(state.data);
   }
 
   const startAt = new Date(timing.startAt);
@@ -164,7 +183,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
   const endVisibleUntil = new Date(endAt.getTime() + timing.endingDelayTotalTime * 1000);
 
   if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
-    return state.data;
+    return applyPollingRgbState(state.data);
   }
 
   if (now.getTime() >= endVisibleUntil.getTime()) {
@@ -177,7 +196,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
           activeDufuserContainerNumber: null,
         },
       },
-      ...DEFAULT_RGB,
+      ...POLLING_IDLE_RGB,
       sessionStartingDelay: null,
       sessionEndingDelay: null,
       session: null,
@@ -195,7 +214,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
         })
       : null;
 
-  return {
+  return applyPollingRgbState({
     ...state.data,
     sessionStartingDelay,
     sessionEndingDelay,
@@ -206,7 +225,7 @@ function materializePollingState(state: CachedPollingState, now = new Date()): P
       end: timing.end,
       remaining,
     },
-  };
+  });
 }
 
 function buildCachedPollingState(
@@ -296,7 +315,6 @@ export async function readPollingDataFromRedis(podId: string): Promise<PollingRe
     const data = materializePollingState(state);
     await writePollingStateToRedis({
       ...state,
-      data,
       storedAt: Date.now(),
     });
 
@@ -318,7 +336,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   if (!pod) {
     const data = {
       podData: basePodData,
-      ...DEFAULT_RGB,
+      ...POLLING_IDLE_RGB,
       sessionStartingDelay: null,
       sessionEndingDelay: null,
       session: null,
@@ -345,7 +363,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   if (!session) {
     const data = {
       podData: basePodData,
-      ...DEFAULT_RGB,
+      ...POLLING_IDLE_RGB,
       sessionStartingDelay: null,
       sessionEndingDelay: null,
       session: null,
@@ -380,9 +398,10 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
     sessionEndingDelay: sessionResponse.data.sessionEndingDelay,
     session: sessionResponse.data.session,
   };
+  const pollingData = applyPollingRgbState(data);
 
   await persistPollingState(buildCachedPollingState(podId, data, sessionResponse.timing));
-  broadcastPollingDataForPod(podId, data);
-  notifyPollingStateUpdated(podId, data);
-  return data;
+  broadcastPollingDataForPod(podId, pollingData);
+  notifyPollingStateUpdated(podId, pollingData);
+  return pollingData;
 }
