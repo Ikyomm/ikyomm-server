@@ -18,4 +18,14 @@ export type PodSessionLogPayload =
   | {
       activeDufuserContainerNumber: number | null;
     }
+  | {
+      playlistId: string | null;
+      musicId: string | null;
+      playbackState: "playing" | "paused";
+      positionSeconds: number;
+      volume: number;
+      outputSource: "speaker" | "bluetooth";
+      updatedAt: string;
+      nonce: string;
+    }
   | Record<string, unknown>;

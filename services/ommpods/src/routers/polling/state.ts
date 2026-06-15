@@ -23,6 +23,9 @@ const EXPIRED_SESSION_REDIS_TTL_SECONDS = 5;
 const SESSION_REDIS_GRACE_SECONDS = 60;
 
 type PodWithAromaDefuser = Awaited<ReturnType<typeof findPodWithAromaDefuser>>;
+type PollingStateUpdateListener = (podId: string, data: PollingResponse) => void;
+
+const pollingStateUpdateListeners = new Set<PollingStateUpdateListener>();
 
 type CachedPollingSessionTiming = {
   id: string;
@@ -45,6 +48,27 @@ type CachedPollingState = {
 
 function getPollingRedisKey(podId: string) {
   return `${POLLING_REDIS_KEY_PREFIX}:${podId}`;
+}
+
+export function subscribeToPollingStateUpdates(listener: PollingStateUpdateListener) {
+  pollingStateUpdateListeners.add(listener);
+
+  return () => {
+    pollingStateUpdateListeners.delete(listener);
+  };
+}
+
+function notifyPollingStateUpdated(podId: string, data: PollingResponse) {
+  for (const listener of pollingStateUpdateListeners) {
+    try {
+      listener(podId, data);
+    } catch (error) {
+      logger.warn("failed to notify polling state listener", {
+        podId,
+        error,
+      });
+    }
+  }
 }
 
 export function buildSafePollingData(): PollingResponse {
@@ -302,6 +326,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
 
     await persistPollingState(buildCachedPollingState(podId, data, null));
     broadcastPollingDataForPod(podId, data);
+    notifyPollingStateUpdated(podId, data);
     return data;
   }
 
@@ -328,6 +353,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
 
     await persistPollingState(buildCachedPollingState(podId, data, null));
     broadcastPollingDataForPod(podId, data);
+    notifyPollingStateUpdated(podId, data);
     return data;
   }
 
@@ -357,5 +383,6 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
 
   await persistPollingState(buildCachedPollingState(podId, data, sessionResponse.timing));
   broadcastPollingDataForPod(podId, data);
+  notifyPollingStateUpdated(podId, data);
   return data;
 }

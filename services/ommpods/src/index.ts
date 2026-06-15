@@ -15,7 +15,7 @@ import { env } from "@/config/env";
 import { openApiInfo } from "@/config/openapi";
 import { logger } from "@/lib/logger";
 import { ommpodsRoutes } from "@/routers";
-import { registerOmmpodsSocketServer } from "@/routers/polling/socket";
+import { registerOmmpodsSocketServer } from "@/routers/socket/socket";
 import type { AppBindings } from "@/types/app";
 
 const app = new OpenAPIHono<AppBindings>();

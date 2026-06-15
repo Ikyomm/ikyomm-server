@@ -46,6 +46,7 @@ export const messageResponseSchema = z.object({
 });
 
 export const DEFAULT_RGB: PodSessionRgb = { r: 255, g: 255, b: 255 };
+export const DEFAULT_MUSIC_VOLUME = 0.72;
 type AromaDefuserRecord = typeof aromaDefusers.$inferSelect;
 type HydratedAromaPod<TPod extends Record<string, unknown>> = TPod & {
   aromaDefusers: AromaDefuserRecord[];
@@ -337,8 +338,57 @@ function getAromaDefuserIdFromPayload(payload: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function getStringFromPayload(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function getNumberFromPayload(
+  payload: Record<string, unknown> | null,
+  key: string,
+  fallback: number
+) {
+  const value = payload?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function getMusicControlFromPayload(payload: unknown) {
+  const data = isObject(payload) ? (payload as Record<string, unknown>) : null;
+  if (!data) {
+    return null;
+  }
+
+  const playbackState: "playing" | "paused" =
+    data.playbackState === "paused" ? "paused" : "playing";
+  const outputSource: "speaker" | "bluetooth" =
+    data.outputSource === "bluetooth" ? "bluetooth" : "speaker";
+  const volume = Math.min(
+    1,
+    Math.max(0, getNumberFromPayload(data, "volume", DEFAULT_MUSIC_VOLUME))
+  );
+
+  return {
+    playlistId: getStringFromPayload(data, "playlistId"),
+    musicId: getStringFromPayload(data, "musicId"),
+    playbackState,
+    positionSeconds: Math.max(0, getNumberFromPayload(data, "positionSeconds", 0)),
+    volume,
+    outputSource,
+    updatedAt: getStringFromPayload(data, "updatedAt") ?? new Date(0).toISOString(),
+    nonce: getStringFromPayload(data, "nonce") ?? "",
+  };
+}
+
+function isMissingMusicChangedEnumError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("MUSIC_CHANGED") &&
+    error.message.includes("pod_session_log")
+  );
+}
+
 export async function resolveSessionControlState(sessionId: string) {
-  const [moodLogs, aromaLogs] = await Promise.all([
+  const [moodLogs, aromaLogs, musicLogs] = await Promise.all([
     db
       .select({
         payload: podSessionLogs.payload,
@@ -367,10 +417,32 @@ export async function resolveSessionControlState(sessionId: string) {
       )
       .orderBy(desc(podSessionLogs.occurredAt))
       .limit(1),
+    db
+      .select({
+        payload: podSessionLogs.payload,
+      })
+      .from(podSessionLogs)
+      .where(
+        and(
+          eq(podSessionLogs.sessionId, sessionId),
+          eq(podSessionLogs.eventType, "MUSIC_CHANGED"),
+          eq(podSessionLogs.isDeleted, false)
+        )
+      )
+      .orderBy(desc(podSessionLogs.occurredAt))
+      .limit(1)
+      .catch((error) => {
+        if (isMissingMusicChangedEnumError(error)) {
+          return [];
+        }
+
+        throw error;
+      }),
   ]);
 
   const latestMoodLog = moodLogs[0];
   const latestAromaLog = aromaLogs[0];
+  const latestMusicLog = musicLogs[0];
   const latestMoodPayload: Record<string, unknown> | null = isObject(latestMoodLog?.payload)
     ? (latestMoodLog.payload as Record<string, unknown>)
     : null;
@@ -393,5 +465,6 @@ export async function resolveSessionControlState(sessionId: string) {
     moodPresetId: moodPreset?.id ?? null,
     activeAromaDefuserId: getAromaDefuserIdFromPayload(latestAromaLog?.payload),
     activeDufuserContainerNumber: getAromaContainerFromPayload(latestAromaLog?.payload),
+    musicControl: getMusicControlFromPayload(latestMusicLog?.payload),
   };
 }

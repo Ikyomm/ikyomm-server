@@ -44,15 +44,15 @@ export function getAromaValidationError(input: {
 
 export async function appendSessionControlLog(input: {
   sessionId: string;
-  eventType: "MOOD_CHANGED" | "AROMA_CHANGED";
+  eventType: "MOOD_CHANGED" | "AROMA_CHANGED" | "MUSIC_CHANGED";
   payload: Record<string, unknown>;
-  createdByUser: string;
+  createdByUser?: string | null;
 }) {
   await db.insert(podSessionLogs).values({
     id: generateRandomId(),
     sessionId: input.sessionId,
     eventType: input.eventType,
     payload: input.payload,
-    createdByUser: input.createdByUser,
+    createdByUser: input.createdByUser ?? null,
   });
 }

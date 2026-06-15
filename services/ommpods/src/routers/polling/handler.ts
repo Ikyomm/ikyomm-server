@@ -8,7 +8,12 @@ import {
   IdStringParamSchema,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { buildSafePollingData, readPollingDataFromRedis, refreshPollingDataForPod } from "./state";
+import {
+  buildSafePollingData,
+  readPollingDataFromRedis,
+  refreshPollingDataForPod,
+  subscribeToPollingStateUpdates,
+} from "./state";
 import { pollingResponseSchema, type PollingResponse } from "./schema";
 
 export const pollingGroup = new OpenAPIHono<AppBindings>();
@@ -64,6 +69,10 @@ function setPollingCacheData(podId: string, data: PollingResponse) {
     updatedAt: Date.now(),
   });
 }
+
+subscribeToPollingStateUpdates((podId, data) => {
+  setPollingCacheData(podId, data);
+});
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
   let timeout: ReturnType<typeof setTimeout> | undefined;

@@ -10,6 +10,7 @@ export const PodSessionLogEventType = pgEnum("pod_session_log_event_type", [
   "SESSION_CREATED",
   "MOOD_CHANGED",
   "AROMA_CHANGED",
+  "MUSIC_CHANGED",
 ]);
 
 export type PodSessionStatus = (typeof PodSessionStatus.enumValues)[number];
