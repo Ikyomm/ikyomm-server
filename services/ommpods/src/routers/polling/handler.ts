@@ -15,6 +15,7 @@ import {
   subscribeToPollingStateUpdates,
 } from "./state";
 import { pollingResponseSchema, type PollingResponse } from "./schema";
+import { buildPodSocketState } from "../socket/state";
 
 export const pollingGroup = new OpenAPIHono<AppBindings>();
 
@@ -194,4 +195,13 @@ registerOpenApiRoute(pollingGroup, route, async (c) => {
   c.header("X-OMMPods-Polling-Source", result.source);
 
   return c.json(createSuccessResponse(result.data), 200);
+});
+
+pollingGroup.get("/pods/:podId/socket-state", async (c) => {
+  const podId = c.req.param("podId");
+  const data = await buildPodSocketState(podId);
+
+  c.header("Cache-Control", "no-store, max-age=0");
+
+  return c.json(createSuccessResponse(data), 200);
 });

@@ -63,6 +63,8 @@ const createWalletLimitMessage = (available: number, requested: number) =>
 registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
   const body = c.req.valid("json");
   const now = new Date();
+  const unlockWindowSeconds = Math.max(getSessionStartEndDelaySeconds(), 5);
+  const sessionEndWindowStart = new Date(now.getTime() - unlockWindowSeconds * 1000);
 
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${body.podId}))`);
@@ -70,9 +72,9 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
     const session = await tx.query.podSessions.findFirst({
       where: and(
         eq(podSessions.podId, body.podId),
-        eq(podSessions.status, "CONFIRMED"),
+        inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
         eq(podSessions.isDeleted, false),
-        gt(podSessions.endAt, now)
+        gt(podSessions.endAt, sessionEndWindowStart)
       ),
       orderBy: (table, { asc }) => [asc(table.endAt)],
       with: {
@@ -86,6 +88,13 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
 
     if (!session) {
       return null;
+    }
+
+    if (session.status !== "CONFIRMED" || session.endAt.getTime() <= now.getTime()) {
+      return {
+        session,
+        location: session.pod?.location,
+      };
     }
 
     const [endedSession] = await tx

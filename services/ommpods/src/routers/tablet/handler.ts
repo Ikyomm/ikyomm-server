@@ -14,6 +14,7 @@ import {
   DEFAULT_MUSIC_VOLUME,
   buildSessionResponse,
   findPodWithAromaDefuser,
+  getSessionStartEndDelaySeconds,
   hydratePodAromaDefusers,
 } from "../shared";
 import { refreshPollingDataForPod } from "../polling/state";
@@ -330,15 +331,17 @@ tabletGroup.post("/pods/:podId/music", async (c) => {
 tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
   const podId = c.req.param("podId");
   const now = new Date();
+  const unlockWindowSeconds = Math.max(getSessionStartEndDelaySeconds(), 5);
+  const sessionEndWindowStart = new Date(now.getTime() - unlockWindowSeconds * 1000);
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${podId}))`);
 
     const session = await tx.query.podSessions.findFirst({
       where: and(
         eq(podSessions.podId, podId),
-        eq(podSessions.status, "CONFIRMED"),
+        inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
         eq(podSessions.isDeleted, false),
-        gt(podSessions.endAt, now)
+        gt(podSessions.endAt, sessionEndWindowStart)
       ),
       orderBy: (table, { asc }) => [asc(table.endAt)],
       with: {
@@ -352,6 +355,13 @@ tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
 
     if (!session) {
       return null;
+    }
+
+    if (session.status !== "CONFIRMED" || session.endAt.getTime() <= now.getTime()) {
+      return {
+        session,
+        location: session.pod?.location,
+      };
     }
 
     const [endedSession] = await tx
