@@ -119,7 +119,7 @@ registerOpenApiRoute(companyMainGroup, create, async (c) => {
   const [slugConflict, { emailExists }, authSeed, nextOrgId] = await Promise.all([
     findCompanyConflictBySlug(body.slug),
     findCompanyOwnerConflicts(body.ownerEmail),
-    createCompanyAuthSeed(env.BETTER_AUTH_SECRET),
+    createCompanyAuthSeed(env.BETTER_AUTH_SECRET, body.password),
     findNextCompanyId(),
   ]);
 

@@ -116,7 +116,7 @@ registerOpenApiRoute(ikyommUsersGroup, create, async (c) => {
     }
   }
 
-  const authSeed = await createOmmpodsUserAuthSeed(env.BETTER_AUTH_SECRET);
+  const authSeed = await createOmmpodsUserAuthSeed(env.BETTER_AUTH_SECRET, body.password);
 
   const userData = await db.transaction(async (tx) => {
     const [insertedUser] = await tx

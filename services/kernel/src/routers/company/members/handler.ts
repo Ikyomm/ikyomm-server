@@ -117,7 +117,7 @@ registerOpenApiRoute(companyMembersGroup, create, async (c) => {
     );
   }
 
-  const authSeed = await createMemberAuthSeed(env.BETTER_AUTH_SECRET);
+  const authSeed = await createMemberAuthSeed(env.BETTER_AUTH_SECRET, body.password);
 
   const memberData = await db.transaction(async (tx) => {
     await ensureDefaultCompanyRoles(tx, body.organizationId);

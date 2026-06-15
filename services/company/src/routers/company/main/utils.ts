@@ -296,8 +296,8 @@ export async function findCompanyConflictByWebsiteDomain(
   );
 }
 
-export async function createCompanyAuthSeed(secret: string) {
-  const password = generateRandomPassword();
+export async function createCompanyAuthSeed(secret: string, passwordInput?: string | null) {
+  const password = passwordInput?.trim() || generateRandomPassword();
   const [hashedPassword, accountId] = await Promise.all([
     PasswordUtils.hash(password),
     Promise.resolve(encryptPassword(password, secret)),

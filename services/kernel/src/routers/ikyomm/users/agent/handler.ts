@@ -153,7 +153,7 @@ registerOpenApiRoute(ikyommAppUsersGroup, create, async (c) => {
     );
   }
 
-  const authSeed = await createOmmpodsAgentAuthSeed(env.BETTER_AUTH_SECRET);
+  const authSeed = await createOmmpodsAgentAuthSeed(env.BETTER_AUTH_SECRET, body.password);
   const initialCreditMinute = body.creditMinute ?? 0;
 
   const userData = await db

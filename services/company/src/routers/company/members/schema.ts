@@ -34,6 +34,10 @@ export const memberCreateSchema = createDbInsertSchema(member, {
     return schema.extend({
       email: z.email("Invalid email address"),
       name: z.string().min(1, "Name is required"),
+      password: z.preprocess(
+        (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+        z.string().trim().min(8, "Password must be at least 8 characters").optional()
+      ),
       phoneNumber: z.string().optional(),
     });
   },

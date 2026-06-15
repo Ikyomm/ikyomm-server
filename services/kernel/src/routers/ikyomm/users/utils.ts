@@ -62,8 +62,8 @@ export async function findOmmpodsUserConflictByPhoneNumber(
     .then((rows) => rows[0]);
 }
 
-export async function createOmmpodsUserAuthSeed(secret: string) {
-  const password = generateRandomPassword();
+export async function createOmmpodsUserAuthSeed(secret: string, passwordInput?: string | null) {
+  const password = passwordInput?.trim() || generateRandomPassword();
   const [hashedPassword, accountId] = await Promise.all([
     PasswordUtils.hash(password),
     Promise.resolve(encryptPassword(password, secret)),

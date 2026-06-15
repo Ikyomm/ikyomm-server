@@ -110,6 +110,10 @@ export const companyCreateSchema = createDbInsertSchema(organization, {
     return schema.extend({
       ownerName: z.string().min(1, "Owner name is required"),
       ownerEmail: z.email("Invalid email address"),
+      password: z.preprocess(
+        (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+        z.string().trim().min(8, "Password must be at least 8 characters").optional()
+      ),
       ownerPhoneNumber: z.string().optional(),
       websiteDomain: websiteDomainSchema.nullish(),
     });

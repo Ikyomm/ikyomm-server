@@ -12,6 +12,10 @@ export const ommpodsUserSchema = createDbSelectSchema(user);
 const ommpodsUserMutableFields = {
   name: z.string().min(1, "Name is required"),
   email: z.email("Invalid email address"),
+  password: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().min(8, "Password must be at least 8 characters").optional()
+  ),
   role: z.string().min(1, "Role is required"),
   image: z.url("Invalid URL").nullish(),
   phoneNumber: z.string().nullish(),
