@@ -339,7 +339,7 @@ tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
     const session = await tx.query.podSessions.findFirst({
       where: and(
         eq(podSessions.podId, podId),
-        inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
+        inArray(podSessions.status, ["CONFIRMED", "CANCELLED", "EMERGENCY_UNLOCKED"]),
         eq(podSessions.isDeleted, false),
         gt(podSessions.endAt, sessionEndWindowStart)
       ),
@@ -367,7 +367,7 @@ tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
     const [endedSession] = await tx
       .update(podSessions)
       .set({
-        status: "CANCELLED",
+        status: "EMERGENCY_UNLOCKED",
         endAt: now,
       })
       .where(eq(podSessions.id, session.id))

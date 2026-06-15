@@ -103,7 +103,7 @@ controlGroup.post("/emergency-unlock/sessions/:sessionId", async (c) => {
   const [endedSession] = await db
     .update(podSessions)
     .set({
-      status: "CANCELLED",
+      status: "EMERGENCY_UNLOCKED",
       endAt: now,
       updatedByUser: currentUser.id,
     })

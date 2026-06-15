@@ -232,6 +232,13 @@
       "when": 1781430000000,
       "tag": "0033_add_music_changed_session_log",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1781519400000,
+      "tag": "0034_add_emergency_unlocked_session_status",
+      "breakpoints": true
     }
   ]
 }

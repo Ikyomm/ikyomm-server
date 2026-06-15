@@ -335,7 +335,7 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
   const session = await db.query.podSessions.findFirst({
     where: and(
       eq(podSessions.podId, pod.id),
-      inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
+      inArray(podSessions.status, ["CONFIRMED", "CANCELLED", "EMERGENCY_UNLOCKED"]),
       eq(podSessions.isDeleted, false),
       gt(podSessions.endAt, sessionEndWindowStart)
     ),

@@ -72,7 +72,7 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
     const session = await tx.query.podSessions.findFirst({
       where: and(
         eq(podSessions.podId, body.podId),
-        inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
+        inArray(podSessions.status, ["CONFIRMED", "CANCELLED", "EMERGENCY_UNLOCKED"]),
         eq(podSessions.isDeleted, false),
         gt(podSessions.endAt, sessionEndWindowStart)
       ),
@@ -100,7 +100,7 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
     const [endedSession] = await tx
       .update(podSessions)
       .set({
-        status: "CANCELLED",
+        status: "EMERGENCY_UNLOCKED",
         endAt: now,
       })
       .where(eq(podSessions.id, session.id))
@@ -265,7 +265,7 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
         .where(
           and(
             eq(podSessions.podId, body.podId),
-            inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
+            inArray(podSessions.status, ["CONFIRMED", "CANCELLED", "EMERGENCY_UNLOCKED"]),
             eq(podSessions.isDeleted, false),
             // Future-start sessions hold reservations; recently ended sessions hold the unlock delay.
             gt(podSessions.endAt, sessionEndWindowStart)
