@@ -90,9 +90,7 @@ export const transferUserCredits = createOpenApiRoute({
   middleware: [walletMethodsRateLimit, ikyommWalletRbac.custom("addCredits")],
   summary: "Transfer credit minutes from the Ikyomm wallet to a user wallet",
   request: {
-    params: IdStringParamSchema().extend({
-      userId: IdStringParamSchema().shape.id,
-    }),
+    params: IdStringParamSchema("userId"),
     body: createApiJsonBody(ikyommWalletAddCreditsSchema.omit({ type: true })),
   },
   responses: {
