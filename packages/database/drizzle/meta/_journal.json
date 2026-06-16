@@ -239,6 +239,13 @@
       "when": 1781519400000,
       "tag": "0034_add_emergency_unlocked_session_status",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1781521451000,
+      "tag": "0035_create_waitlist",
+      "breakpoints": true
     }
   ]
 }

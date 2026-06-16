@@ -17,6 +17,15 @@ export type UserMetadata = {
   gender?: "male" | "female" | "dont_disclose" | null;
 };
 
+export const waitlist = pgTable(
+  "waitlist",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+  },
+  (table) => [uniqueIndex("waitlist_email_uidx").on(table.email)]
+);
+
 export const user = pgTable(
   "user",
   {
