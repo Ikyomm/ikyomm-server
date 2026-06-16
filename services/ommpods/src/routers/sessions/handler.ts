@@ -2,6 +2,7 @@ import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
   db,
+  podMoodPresets,
   podSessionLogs,
   podSessions,
   pods,
@@ -258,6 +259,18 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
         throw new Error("RATE_SLAB_NOT_FOUND");
       }
 
+      const moodPreset = await tx.query.podMoodPresets.findFirst({
+        where: and(eq(podMoodPresets.id, body.moodPresetId), eq(podMoodPresets.isDeleted, false)),
+      });
+
+      if (!moodPreset) {
+        throw new Error("MOOD_PRESET_NOT_FOUND");
+      }
+
+      if (pod.type && !moodPreset.enabledPodTypes.includes(pod.type)) {
+        throw new Error("MOOD_PRESET_NOT_ENABLED");
+      }
+
       const sessionEndWindowStart = new Date(Date.now() - getSessionStartEndDelaySeconds() * 1000);
       const overlappingSession = await tx
         .select({ id: podSessions.id })
@@ -349,9 +362,20 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
           podId: body.podId,
           rateMinute: selectedRateSlab.minute,
           rateCredit: selectedRateSlab.credit,
+          moodPresetId: moodPreset.id,
           sessionStartingDelay: buildSessionStartingDelay(getSessionStartingDelaySeconds()),
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
+        },
+        createdByUser: currentUser.id,
+      });
+
+      await tx.insert(podSessionLogs).values({
+        id: generateRandomId(),
+        sessionId,
+        eventType: "MOOD_CHANGED",
+        payload: {
+          moodPresetId: moodPreset.id,
         },
         createdByUser: currentUser.id,
       });
@@ -368,6 +392,8 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
           "POD_NOT_FOUND",
           "POD_NOT_ACTIVE",
           "RATE_SLAB_NOT_FOUND",
+          "MOOD_PRESET_NOT_FOUND",
+          "MOOD_PRESET_NOT_ENABLED",
           "POD_SESSION_CONFLICT",
           "USER_WALLET_NOT_FOUND",
         ].includes(error.message) ||
@@ -381,7 +407,9 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
 
   if (typeof result === "string") {
     const status =
-      result === "POD_NOT_FOUND" || result === "USER_WALLET_NOT_FOUND"
+      result === "POD_NOT_FOUND" ||
+      result === "USER_WALLET_NOT_FOUND" ||
+      result === "MOOD_PRESET_NOT_FOUND"
         ? 404
         : result === "POD_SESSION_CONFLICT"
           ? 409
@@ -390,6 +418,8 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
       POD_NOT_FOUND: "Pod not found",
       POD_NOT_ACTIVE: "Pod is not active",
       RATE_SLAB_NOT_FOUND: "Selected rate slab not found for this Pod",
+      MOOD_PRESET_NOT_FOUND: "Mood preset not found",
+      MOOD_PRESET_NOT_ENABLED: "Mood preset is not enabled for this pod type",
       POD_SESSION_CONFLICT: "Pod already has an active or held session",
       USER_WALLET_NOT_FOUND: "User wallet not found",
     };

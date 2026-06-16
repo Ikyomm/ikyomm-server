@@ -27,6 +27,7 @@ import { sessionResponseSchema } from "../shared";
 export const sessionCreateSchema = z.object({
   podId: z.string().trim().min(1),
   rateMinute: z.coerce.number().int().positive(),
+  moodPresetId: z.string().trim().min(1),
 });
 
 export const sessionCreateResponseSchema = sessionResponseSchema;
