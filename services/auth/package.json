@@ -34,9 +34,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.0",
     "@ikyomm/typescript-config": "workspace:*",
-    "@types/node": "^25.9.2",
+    "@types/node": "^25.9.3",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"
