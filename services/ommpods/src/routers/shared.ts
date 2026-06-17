@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { env } from "@/config/env";
 import {
+  type AromaDefuserContainerType,
   aromaDefusers,
   db,
   podMoodPresets,
@@ -316,6 +317,25 @@ export function findContainer(
   return (aromaDefuser?.containers ?? []).find((container) => container.number === containerNumber);
 }
 
+export function findFirstAromaContainerByType(
+  aromaDefusersList: Array<typeof aromaDefusers.$inferSelect> = [],
+  containerType: AromaDefuserContainerType | null | undefined
+) {
+  if (!containerType) {
+    return null;
+  }
+
+  for (const aromaDefuser of aromaDefusersList) {
+    const container = (aromaDefuser.containers ?? []).find((item) => item.type === containerType);
+
+    if (container) {
+      return { aromaDefuser, container };
+    }
+  }
+
+  return null;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -336,6 +356,14 @@ function getAromaDefuserIdFromPayload(payload: unknown) {
 
   const value = payload.activeAromaDefuserId;
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function isExplicitAromaOffPayload(payload: unknown) {
+  return (
+    isObject(payload) &&
+    "activeDufuserContainerNumber" in payload &&
+    payload.activeDufuserContainerNumber === null
+  );
 }
 
 function getStringFromPayload(payload: Record<string, unknown> | null, key: string) {
@@ -387,11 +415,15 @@ function isMissingMusicChangedEnumError(error: unknown) {
   );
 }
 
-export async function resolveSessionControlState(sessionId: string) {
+export async function resolveSessionControlState(
+  sessionId: string,
+  options: { aromaDefusers?: Array<typeof aromaDefusers.$inferSelect> } = {}
+) {
   const [moodLogs, aromaLogs, musicLogs] = await Promise.all([
     db
       .select({
         payload: podSessionLogs.payload,
+        occurredAt: podSessionLogs.occurredAt,
       })
       .from(podSessionLogs)
       .where(
@@ -406,6 +438,7 @@ export async function resolveSessionControlState(sessionId: string) {
     db
       .select({
         payload: podSessionLogs.payload,
+        occurredAt: podSessionLogs.occurredAt,
       })
       .from(podSessionLogs)
       .where(
@@ -456,15 +489,45 @@ export async function resolveSessionControlState(sessionId: string) {
         columns: {
           id: true,
           rgb: true,
+          aromaDefuserContainerType: true,
         },
       })
     : null;
+  const hasAromaOverrideAfterMood =
+    Boolean(latestAromaLog) &&
+    (!latestMoodLog || latestAromaLog.occurredAt.getTime() >= latestMoodLog.occurredAt.getTime());
+  const explicitAromaOff =
+    hasAromaOverrideAfterMood && isExplicitAromaOffPayload(latestAromaLog?.payload);
+  const aromaOverride =
+    hasAromaOverrideAfterMood && !explicitAromaOff
+      ? {
+          activeAromaDefuserId: getAromaDefuserIdFromPayload(latestAromaLog?.payload),
+          activeDufuserContainerNumber: getAromaContainerFromPayload(latestAromaLog?.payload),
+        }
+      : null;
+  const resolvedAroma = explicitAromaOff
+    ? null
+    : aromaOverride?.activeAromaDefuserId && aromaOverride.activeDufuserContainerNumber
+      ? aromaOverride
+      : (() => {
+          const matched = findFirstAromaContainerByType(
+            options.aromaDefusers ?? [],
+            moodPreset?.aromaDefuserContainerType
+          );
+
+          return matched
+            ? {
+                activeAromaDefuserId: matched.aromaDefuser.id,
+                activeDufuserContainerNumber: matched.container.number,
+              }
+            : null;
+        })();
 
   return {
     rgb: moodPreset?.rgb ?? DEFAULT_RGB,
     moodPresetId: moodPreset?.id ?? null,
-    activeAromaDefuserId: getAromaDefuserIdFromPayload(latestAromaLog?.payload),
-    activeDufuserContainerNumber: getAromaContainerFromPayload(latestAromaLog?.payload),
+    activeAromaDefuserId: resolvedAroma?.activeAromaDefuserId ?? null,
+    activeDufuserContainerNumber: resolvedAroma?.activeDufuserContainerNumber ?? null,
     musicControl: getMusicControlFromPayload(latestMusicLog?.payload),
   };
 }

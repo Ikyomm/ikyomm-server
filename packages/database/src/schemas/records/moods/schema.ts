@@ -2,9 +2,9 @@ import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, text } from "drizzle-orm/pg-core";
 import { user } from "../../auth";
 import { referenceColumns } from "../../reference-columns";
-import { OmmPodType } from "../enums";
+import { AromaDefuserContainerType, OmmPodType } from "../enums";
 import type {
-  PodMoodPresetAromaDefuserContainer,
+  PodMoodPresetAromaDefuserContainerType,
   PodMoodPresetColor,
   PodMoodPresetEnabledPodTypes,
   PodMoodPresetRgb,
@@ -28,10 +28,10 @@ export const podMoodPresets = pgTable(
       .$type<PodMoodPresetEnabledPodTypes>()
       .notNull()
       .default(sql`ARRAY['NEO', 'PRIMO', 'RESTORE', 'SIGNATURE']::ommpod_type[]`),
-    aromaDefuserContainers: jsonb("aroma_defuser_containers")
-      .$type<PodMoodPresetAromaDefuserContainer[]>()
+    aromaDefuserContainerType: AromaDefuserContainerType("aroma_defuser_container_type")
+      .$type<PodMoodPresetAromaDefuserContainerType>()
       .notNull()
-      .default([]),
+      .default("SETTLE"),
     playlistIds: jsonb("playlist_ids").$type<string[]>().notNull().default([]),
     defaultMusic: text("default_music").notNull(),
     metadata: text("metadata"),
@@ -40,7 +40,7 @@ export const podMoodPresets = pgTable(
   (table) => [
     index("pod_mood_presets_title_idx").on(table.title),
     index("pod_mood_presets_enabledPodTypes_idx").using("gin", table.enabledPodTypes),
-    index("pod_mood_presets_aromaDefuserContainers_idx").using("gin", table.aromaDefuserContainers),
+    index("pod_mood_presets_aromaDefuserContainerType_idx").on(table.aromaDefuserContainerType),
     index("pod_mood_presets_isDeleted_createdAt_idx").on(table.isDeleted, table.createdAt),
     index("pod_mood_presets_isDeleted_updatedAt_idx").on(table.isDeleted, table.updatedAt),
   ]

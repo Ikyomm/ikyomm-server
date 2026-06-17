@@ -1,4 +1,4 @@
-import { aromaDefusers } from "@ikyomm/database";
+import { AromaDefuserContainerType, aromaDefusers } from "@ikyomm/database";
 import {
   createDbInsertSchema,
   createDbSelectSchema,
@@ -12,6 +12,7 @@ import { z } from "@hono/zod-openapi";
 export const aromaDefuserContainerSchema = z.object({
   number: z.coerce.number().int().positive(),
   fragrance: z.string().trim().min(1),
+  type: z.enum(AromaDefuserContainerType.enumValues),
 });
 
 export const aromaDefuserContainersSchema = z.array(aromaDefuserContainerSchema);

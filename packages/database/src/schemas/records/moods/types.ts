@@ -1,4 +1,4 @@
-import type { OmmPodType } from "../enums";
+import type { AromaDefuserContainerType, OmmPodType } from "../enums";
 
 export type PodMoodPresetRgb = {
   r: number;
@@ -12,8 +12,4 @@ export type PodMoodPresetColor = {
 };
 
 export type PodMoodPresetEnabledPodTypes = OmmPodType[];
-
-export type PodMoodPresetAromaDefuserContainer = {
-  aromaDefuserId: string;
-  containerNumbers: number[];
-};
+export type PodMoodPresetAromaDefuserContainerType = AromaDefuserContainerType;

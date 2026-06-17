@@ -383,7 +383,9 @@ export async function refreshPollingDataForPod(podId: string): Promise<PollingRe
     return data;
   }
 
-  const controlState = await resolveSessionControlState(session.id);
+  const controlState = await resolveSessionControlState(session.id, {
+    aromaDefusers: pod.aromaDefusers,
+  });
   const rgb = controlState.rgb;
   const sessionResponse = buildPollingSessionTiming(session, now, pod);
   const activeAromaDefuser =
