@@ -17,7 +17,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.4",
+    "@hono/node-server": "^2.0.5",
     "@hono/zod-openapi": "^1.4.0",
     "@ikyomm/database": "workspace:*",
     "@ikyomm/logger": "workspace:*",
@@ -25,7 +25,7 @@
     "@ikyomm/utils": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.25",
+    "hono": "^4.12.26",
     "zod": "^4.4.3"
   },
   "devDependencies": {
