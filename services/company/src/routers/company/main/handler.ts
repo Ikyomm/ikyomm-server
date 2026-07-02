@@ -9,8 +9,18 @@ import {
   getBetterAuthContext,
   registerOpenApiRoute,
 } from "@ikyomm/utils";
-import { account, db, member, organization, user } from "@ikyomm/database";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import {
+  account,
+  db,
+  member,
+  organization,
+  organizationWallet,
+  podSessions,
+  user,
+  userWallet,
+  walletTransactions,
+} from "@ikyomm/database";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { emailSubject, renderAccountCredEmail, sendEmail } from "@ikyomm/notification";
 import { fetchCompanyList } from "./list";
 import {
@@ -323,38 +333,86 @@ registerOpenApiRoute(companyMainGroup, remove_permanently, async (c) => {
       .from(member)
       .where(eq(member.organizationId, id));
 
-    const memberUserIds = Array.from(
-      new Set(organizationMembers.map((row) => row.userId).filter(Boolean))
+    const companyAssignedUsers = await tx
+      .select({
+        userId: user.id,
+      })
+      .from(user)
+      .where(eq(user.company, id));
+
+    const linkedUserIds = Array.from(
+      new Set([
+        ...organizationMembers.map((row) => row.userId),
+        ...companyAssignedUsers.map((row) => row.userId),
+      ])
     );
 
-    await tx.delete(organization).where(eq(organization.id, id));
+    let organizationOnlyUserIds = linkedUserIds;
+    if (linkedUserIds.length > 0) {
+      const usersWithOtherOrganizations = await tx
+        .select({
+          userId: member.userId,
+        })
+        .from(member)
+        .where(and(inArray(member.userId, linkedUserIds), ne(member.organizationId, id)));
 
-    if (memberUserIds.length === 0) {
-      return;
+      const userIdsWithOtherOrganizations = new Set(
+        usersWithOtherOrganizations.map((row) => row.userId)
+      );
+      organizationOnlyUserIds = linkedUserIds.filter(
+        (userId) => !userIdsWithOtherOrganizations.has(userId)
+      );
     }
 
-    const usersWithOtherOrganizations = await tx
+    const organizationWallets = await tx
       .select({
-        userId: member.userId,
+        id: organizationWallet.id,
       })
-      .from(member)
-      .where(and(inArray(member.userId, memberUserIds), ne(member.organizationId, id)));
+      .from(organizationWallet)
+      .where(eq(organizationWallet.organizationId, id));
+    const organizationWalletIds = organizationWallets.map((wallet) => wallet.id);
 
-    const userIdsWithOtherOrganizations = new Set(
-      usersWithOtherOrganizations.map((row) => row.userId)
-    );
-    const organizationOnlyUserIds = memberUserIds.filter(
-      (userId) => !userIdsWithOtherOrganizations.has(userId)
-    );
+    if (organizationWalletIds.length > 0) {
+      await tx
+        .delete(walletTransactions)
+        .where(
+          or(
+            inArray(walletTransactions.fromOrganizationWalletId, organizationWalletIds),
+            inArray(walletTransactions.toOrganizationWalletId, organizationWalletIds)
+          )
+        );
+    }
 
     if (organizationOnlyUserIds.length > 0) {
+      const organizationUserWallets = await tx
+        .select({
+          id: userWallet.id,
+        })
+        .from(userWallet)
+        .where(inArray(userWallet.userId, organizationOnlyUserIds));
+      const organizationUserWalletIds = organizationUserWallets.map((wallet) => wallet.id);
+
+      if (organizationUserWalletIds.length > 0) {
+        await tx
+          .delete(walletTransactions)
+          .where(
+            or(
+              inArray(walletTransactions.fromUserWalletId, organizationUserWalletIds),
+              inArray(walletTransactions.toUserWalletId, organizationUserWalletIds)
+            )
+          );
+      }
+
+      await tx.delete(podSessions).where(inArray(podSessions.userId, organizationOnlyUserIds));
       await tx.delete(user).where(inArray(user.id, organizationOnlyUserIds));
     }
+
+    await tx.delete(organization).where(eq(organization.id, id));
   });
 
   return c.json(
     createSuccessResponse({
-      message: "Company and organization-only users permanently deleted successfully",
+      message: "Company and all organization-owned records permanently deleted successfully",
     }),
     200
   );
