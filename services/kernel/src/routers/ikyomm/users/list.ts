@@ -14,7 +14,7 @@ export const fetchOmmpodsUserList = createTableListFetcher<
     and(
       eq(user.panel, "ikyomm"),
       eq(user.isDeleted, params.isDeleted ?? false),
-      ne(user.role, "agent"),
+      params.role ? eq(user.role, params.role) : ne(user.role, "agent"),
       params.excludeUserId ? ne(user.id, params.excludeUserId) : undefined
     ),
   search: {
