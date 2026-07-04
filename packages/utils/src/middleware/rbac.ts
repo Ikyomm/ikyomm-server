@@ -21,6 +21,7 @@ export const RBAC_ACTIONS = {
   get: "get",
   getAll: "getAll",
   publish: "publish",
+  permanentDelete: "permanentDelete",
   search: "search",
   terminate: "terminate",
   subscription: "subscription",

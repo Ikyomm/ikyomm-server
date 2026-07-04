@@ -18,16 +18,19 @@ Dedicated Hono/OpenAPI service for the IKYOMM Treasure ecommerce domain.
 | Categories | `/categories` | top-level product categories |
 | Subcategories | `/subcategories` | subcategories linked to categories |
 | Products | `/products` | products and complete product details |
-| Product variants | `/product-variants` | SKU variants |
-| Product images | `/product-images` | product image references |
-| Variant attributes | `/variant-attributes` | variant attributes |
+| Product variants | `/product-variants` | SKU variants with embedded attributes |
 | Inventory | `/inventory` | warehouses, stocks |
 | Orders | `/orders` | orders, items, payments |
 | Addresses | `/addresses` | current user's billing and shipping addresses |
 | Subscriptions | `/subscriptions` | current user's recurring subscriptions |
 | Reviews | `/reviews` | current user's product reviews |
 
-Every resource exposes list, get, create, update, soft-delete, and restore operations. Brand, category, subcategory, product, variant, and image reads are public. Their writes and inventory writes require an authenticated IKYOMM staff account. User-owned resources are automatically scoped to the authenticated `user.id`. Order items and payments are restricted to orders owned by that user.
+Address lookup routes:
+
+- `GET /addresses/user/{userId}` — active addresses for a user
+- `GET /addresses/order/{orderId}` — billing and shipping addresses plus immutable order snapshots
+
+Every resource exposes list, get, create, update, soft-delete, restore, and permanent-delete operations. Brand, category, subcategory, product, and variant reads are public. Their writes and inventory writes require an authenticated IKYOMM staff account and the matching resource permission. User-owned resources are automatically scoped to the authenticated `user.id`. Order items and payments are restricted to orders owned by that user.
 
 Subscription creation verifies the selected variant's product has `isSubscriptionEligible = true`.
 
@@ -41,8 +44,12 @@ For a resource mounted at `<resource>`:
 - `PATCH <resource>/{id}` — update
 - `DELETE <resource>/{id}` — soft-delete
 - `POST <resource>/{id}/restore` — restore
+- `DELETE <resource>/{id}/permanent` — permanently delete an already soft-deleted record
 
-Product lists return each product with its referenced `images` array. Product list
+Standard resource lists accept `search`, `sortBy`, `sortOrder`, and `isDeleted` in addition to pagination and return `totalItems`.
+
+Product lists return each product with its embedded `images` array. Variant attributes
+are stored in each variant's `attributes` object. Product list
 queries additionally support:
 
 - `search`

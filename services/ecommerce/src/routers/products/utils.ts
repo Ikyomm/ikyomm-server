@@ -1,6 +1,6 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { db, productImages, products, productVariants } from "@ikyomm/database";
-import { and, asc, eq } from "drizzle-orm";
+import { db, products, productVariants } from "@ikyomm/database";
+import { and, eq } from "drizzle-orm";
 import type { AppBindings } from "@/types/app";
 import { registerCrudResource } from "../shared/crud";
 import { productResources } from "./openapi.route";
@@ -16,15 +16,8 @@ export function findProductDetails(id: string) {
       brand: true,
       category: true,
       subcategory: true,
-      images: {
-        where: eq(productImages.isDeleted, false),
-        orderBy: [asc(productImages.sortOrder)],
-      },
       variants: {
         where: eq(productVariants.isDeleted, false),
-        with: {
-          attributes: true,
-        },
       },
     },
   });

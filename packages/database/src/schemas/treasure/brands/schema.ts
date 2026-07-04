@@ -12,8 +12,6 @@ export const brands = pgTable(
     logo: text("logo"),
     positioning: text("positioning"),
     tagline: text("tagline"),
-    coreCategories: text("core_categories").array(),
-    futureExpansion: text("future_expansion").array(),
     status: BrandStatus("status").default("ACTIVE").notNull(),
     ...referenceColumns((): AnyPgColumn => user.id),
   },

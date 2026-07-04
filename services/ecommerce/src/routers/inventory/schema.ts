@@ -18,6 +18,7 @@ export const warehouseSchemas = {
   insertSchema: createDbInsertSchema(warehouses, { omit: insertOmit }),
   updateSchema: createDbUpdateSchema(warehouses, { omit: updateOmit }),
 };
+
 export const inventorySchemas = {
   selectSchema: createDbSelectSchema(inventory),
   insertSchema: createDbInsertSchema(inventory, { omit: insertOmit }),

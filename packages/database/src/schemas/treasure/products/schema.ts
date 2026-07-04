@@ -5,7 +5,6 @@ import {
   check,
   foreignKey,
   index,
-  integer,
   jsonb,
   pgTable,
   real,
@@ -19,6 +18,13 @@ import { categories, subcategories } from "../categories/schema";
 import { ProductStatus, ProductType, StockStatus, VariantStatus } from "./enums";
 
 export type ProductMetadata = Record<string, string | number | boolean | null>;
+export type ProductImage = {
+  url: string;
+  altText?: string | null;
+  isPrimary?: boolean;
+  sortOrder?: number;
+};
+export type ProductVariantAttributes = Record<string, string>;
 
 export const products = pgTable(
   "treasure_products",
@@ -44,11 +50,11 @@ export const products = pgTable(
     productType: ProductType("product_type").default("VARIABLE").notNull(),
     status: ProductStatus("status").default("DRAFT").notNull(),
     isHeroProduct: boolean("is_hero_product").default(false).notNull(),
-    isPrivateLabel: boolean("is_private_label").default(false).notNull(),
     isSubscriptionEligible: boolean("is_subscription_eligible").default(false).notNull(),
     isBundleEligible: boolean("is_bundle_eligible").default(false).notNull(),
     isCorporateGiftEligible: boolean("is_corporate_gift_eligible").default(false).notNull(),
     isOmmpodsCompatible: boolean("is_ommpods_compatible").default(false).notNull(),
+    images: jsonb("images").$type<ProductImage[]>().default([]).notNull(),
     metadata: jsonb("metadata").$type<ProductMetadata>(),
     ...referenceColumns((): AnyPgColumn => user.id),
   },
@@ -81,10 +87,8 @@ export const productVariants = pgTable(
     estimatedCogs: real("estimated_cogs"),
     price: real("price").notNull(),
     currency: text("currency").default("INR").notNull(),
-    grossMarginTarget: real("gross_margin_target"),
-    vendor: text("vendor"),
-    minimumOrderQuantity: integer("minimum_order_quantity"),
     packaging: text("packaging"),
+    attributes: jsonb("attributes").$type<ProductVariantAttributes>().default({}).notNull(),
     stockStatus: StockStatus("stock_status").default("OUT_OF_STOCK").notNull(),
     status: VariantStatus("status").default("PLANNED").notNull(),
     ...referenceColumns((): AnyPgColumn => user.id),
@@ -99,50 +103,5 @@ export const productVariants = pgTable(
       "treasure_product_variants_estimated_cogs_check",
       sql`${table.estimatedCogs} is null or ${table.estimatedCogs} >= 0`
     ),
-    check(
-      "treasure_product_variants_margin_check",
-      sql`${table.grossMarginTarget} is null or (${table.grossMarginTarget} >= 0 and ${table.grossMarginTarget} <= 100)`
-    ),
-    check(
-      "treasure_product_variants_moq_check",
-      sql`${table.minimumOrderQuantity} is null or ${table.minimumOrderQuantity} > 0`
-    ),
-  ]
-);
-
-export const productImages = pgTable(
-  "treasure_product_images",
-  {
-    id: text("id").primaryKey(),
-    productId: text("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
-    url: text("url").notNull(),
-    altText: text("alt_text"),
-    isPrimary: boolean("is_primary").default(false).notNull(),
-    sortOrder: integer("sort_order").default(0).notNull(),
-    ...referenceColumns((): AnyPgColumn => user.id),
-  },
-  (table) => [
-    uniqueIndex("treasure_product_images_product_url_uidx").on(table.productId, table.url),
-    index("treasure_product_images_product_sort_idx").on(table.productId, table.sortOrder),
-    check("treasure_product_images_sort_order_check", sql`${table.sortOrder} >= 0`),
-  ]
-);
-
-export const variantAttributes = pgTable(
-  "treasure_variant_attributes",
-  {
-    id: text("id").primaryKey(),
-    variantId: text("variant_id")
-      .notNull()
-      .references(() => productVariants.id, { onDelete: "cascade" }),
-    attributeName: text("attribute_name").notNull(),
-    attributeValue: text("attribute_value").notNull(),
-    ...referenceColumns((): AnyPgColumn => user.id),
-  },
-  (table) => [
-    uniqueIndex("treasure_variant_attributes_name_uidx").on(table.variantId, table.attributeName),
-    index("treasure_variant_attributes_variant_id_idx").on(table.variantId),
   ]
 );

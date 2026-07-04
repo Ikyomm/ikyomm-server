@@ -17,7 +17,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     { name: "Product Variants", description: "SKU and product variant management." },
     { name: "Product Images", description: "Product image references and ordering." },
     { name: "Variant Attributes", description: "Variant-specific attribute management." },
-    { name: "Inventory", description: "Warehouses and variant stock." },
+    { name: "Inventory", description: "Warehouses and product variant stock management." },
     { name: "Orders", description: "Orders, order items, and payments." },
     { name: "Addresses", description: "Authenticated user billing and shipping addresses." },
     { name: "Subscriptions", description: "Authenticated recurring product subscriptions." },

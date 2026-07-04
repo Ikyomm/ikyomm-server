@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Generic Drizzle tables and OpenAPI schemas are registered dynamically. */
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "@hono/zod-openapi";
-import { db, orders } from "@ikyomm/database";
+import { db, orders, type DatabaseResource } from "@ikyomm/database";
 import {
   createApiJsonBody,
   createApiSuccessResponse,
@@ -10,14 +10,17 @@ import {
   createSuccessResponse,
   generateRandomId,
   getBetterAuthContext,
+  hasPermission,
   registerOpenApiRoute,
+  type RbacAction,
 } from "@ikyomm/utils";
-import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, or } from "drizzle-orm";
 import type { AppBindings } from "@/types/app";
 import { ecommerceAuthMiddleware } from "./auth";
 import {
   ecommerceDeleteResultSchema,
   ecommerceListQuerySchema,
+  ecommercePermanentDeleteResultSchema,
   ecommerceRestoreResultSchema,
 } from "./schema";
 
@@ -36,6 +39,9 @@ export interface CrudResourceConfig {
   updateSchema: z.ZodTypeAny;
   publicRead?: boolean;
   staffWrite?: boolean;
+  permissionResource?: DatabaseResource;
+  searchColumns?: any[];
+  sortColumns?: Record<string, any>;
   ownerColumn?: any;
   ownerKey?: string;
   parentOrderColumn?: any;
@@ -72,12 +78,21 @@ function forbidden(c: any) {
   );
 }
 
-function resourceConditions(resource: CrudResourceConfig, userId: string | null) {
+function resourceConditions(
+  resource: CrudResourceConfig,
+  userId: string | null,
+  query?: Record<string, unknown>
+) {
   const columns = getTableColumns(resource.table) as Record<string, any>;
   const conditions: any[] = [];
 
   if (columns.isDeleted) {
-    conditions.push(eq(columns.isDeleted, false));
+    conditions.push(eq(columns.isDeleted, query?.isDeleted === true));
+  }
+
+  if (typeof query?.search === "string" && resource.searchColumns?.length) {
+    const pattern = `%${query.search}%`;
+    conditions.push(or(...resource.searchColumns.map((column) => ilike(column, pattern))));
   }
 
   if (resource.ownerColumn && userId) {
@@ -101,10 +116,32 @@ function scopedWhere(resource: CrudResourceConfig, id: string, userId: string | 
   return and(eq(columns.id, id), ...conditions);
 }
 
-function assertWriteAccess(resource: CrudResourceConfig, c: any) {
+function assertWriteAccess(resource: CrudResourceConfig, c: any, action: RbacAction) {
   if (resource.staffWrite && !isStaffContext(c)) {
     return forbidden(c);
   }
+
+  if (resource.permissionResource) {
+    const auth = getBetterAuthContext(c);
+    const role = auth.authorization.role?.trim().toLowerCase();
+    const permission = auth.authorization.permissions?.[resource.permissionResource];
+    const hasAdminFallback = role === "admin" && !permission;
+
+    if (
+      role !== "superadmin" &&
+      !hasAdminFallback &&
+      !hasPermission(auth, { resource: resource.permissionResource, action })
+    ) {
+      return c.json(
+        createErrorResponse({
+          error: "Forbidden",
+          message: `Missing permission: ${resource.permissionResource}.${action}`,
+        }),
+        403
+      );
+    }
+  }
+
   return null;
 }
 
@@ -117,14 +154,23 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     items: z.array(resource.selectSchema),
     limit: z.number(),
     offset: z.number(),
+    totalItems: z.number(),
   });
+  const listAuthMiddleware = async (c: any, next: any) => {
+    const requestsDeletedRecords = c.req.query("isDeleted") === "true";
+    if (resource.publicRead && !requestsDeletedRecords) {
+      await next();
+      return;
+    }
+    return ecommerceAuthMiddleware(c, next);
+  };
 
   const listRoute = createOpenApiRoute({
     method: "get",
     path: basePath,
     operationId: `${operationBase}List`,
     tags: [resource.tag],
-    middleware: resource.publicRead ? [] : [ecommerceAuthMiddleware],
+    middleware: [listAuthMiddleware],
     summary: `List ${resource.name}`,
     request: { query: listQuerySchema },
     responses: {
@@ -206,10 +252,30 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     },
   });
 
+  const permanentDeleteRoute = createOpenApiRoute({
+    method: "delete",
+    path: `${itemPath}/permanent`,
+    operationId: `${operationBase}PermanentDeleteById`,
+    tags: [resource.tag],
+    middleware: [ecommerceAuthMiddleware],
+    summary: `Permanently delete ${resource.name}`,
+    request: { params: z.object({ id: z.string().min(1) }) },
+    responses: {
+      200: createApiSuccessResponse(
+        ecommercePermanentDeleteResultSchema,
+        `${resource.name} permanently deleted successfully`
+      ),
+    },
+  });
+
   registerOpenApiRoute(app, listRoute, async (c: any) => {
     const query = c.req.valid("query");
+    if (query.isDeleted === true && resource.permissionResource) {
+      const denied = assertWriteAccess(resource, c, "getAll");
+      if (denied) return denied;
+    }
     const userId = userIdFromContext(c);
-    const { columns, conditions } = resourceConditions(resource, userId);
+    const { columns, conditions } = resourceConditions(resource, userId, query);
     let statement = db
       .select()
       .from(resource.table)
@@ -217,7 +283,13 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
       .limit(query.limit)
       .offset(query.offset);
 
-    if (columns.createdAt) {
+    const sortColumn =
+      typeof query.sortBy === "string" ? resource.sortColumns?.[query.sortBy] : undefined;
+    if (sortColumn) {
+      statement = statement.orderBy(
+        query.sortOrder === "asc" ? asc(sortColumn) : desc(sortColumn)
+      ) as typeof statement;
+    } else if (columns.createdAt) {
       statement = statement.orderBy(desc(columns.createdAt)) as typeof statement;
     }
 
@@ -229,7 +301,17 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
           query,
         })
       : await statement;
-    return c.json(createSuccessResponse({ items, limit: query.limit, offset: query.offset }), 200);
+    const totalItems = resource.listLoader
+      ? items.length
+      : await db
+          .select({ value: count() })
+          .from(resource.table)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .then((rows) => rows[0]?.value ?? 0);
+    return c.json(
+      createSuccessResponse({ items, limit: query.limit, offset: query.offset, totalItems }),
+      200
+    );
   });
 
   registerOpenApiRoute(app, getRoute, async (c: any) => {
@@ -254,7 +336,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
   });
 
   registerOpenApiRoute(app, createRoute, async (c: any) => {
-    const denied = assertWriteAccess(resource, c);
+    const denied = assertWriteAccess(resource, c, "create");
     if (denied) return denied;
 
     const userId = userIdFromContext(c);
@@ -299,7 +381,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
   });
 
   registerOpenApiRoute(app, updateRoute, async (c: any) => {
-    const denied = assertWriteAccess(resource, c);
+    const denied = assertWriteAccess(resource, c, "update");
     if (denied) return denied;
     const userId = userIdFromContext(c);
     const { id } = c.req.valid("param");
@@ -334,7 +416,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
   });
 
   registerOpenApiRoute(app, deleteRoute, async (c: any) => {
-    const denied = assertWriteAccess(resource, c);
+    const denied = assertWriteAccess(resource, c, "delete");
     if (denied) return denied;
     const userId = userIdFromContext(c);
     const { id } = c.req.valid("param");
@@ -354,7 +436,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
   });
 
   registerOpenApiRoute(app, restoreRoute, async (c: any) => {
-    const denied = assertWriteAccess(resource, c);
+    const denied = assertWriteAccess(resource, c, "restore");
     if (denied) return denied;
     const userId = userIdFromContext(c);
     const { id } = c.req.valid("param");
@@ -382,5 +464,38 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
       );
     }
     return c.json(createSuccessResponse({ id: item.id, restored: true }), 200);
+  });
+
+  registerOpenApiRoute(app, permanentDeleteRoute, async (c: any) => {
+    const denied = assertWriteAccess(resource, c, "permanentDelete");
+    if (denied) return denied;
+    const userId = userIdFromContext(c);
+    const { id } = c.req.valid("param");
+    const columns = getTableColumns(resource.table) as Record<string, any>;
+    const conditions = [eq(columns.id, id), eq(columns.isDeleted, true)];
+    if (resource.ownerColumn && userId) conditions.push(eq(resource.ownerColumn, userId));
+    if (resource.parentOrderColumn && userId) {
+      conditions.push(
+        inArray(
+          resource.parentOrderColumn,
+          db.select({ id: orders.id }).from(orders).where(eq(orders.userId, userId))
+        )
+      );
+    }
+    const item = await db
+      .delete(resource.table)
+      .where(and(...conditions))
+      .returning({ id: columns.id })
+      .then((rows) => rows[0]);
+    if (!item) {
+      return c.json(
+        createErrorResponse({
+          error: "Not Found",
+          message: `Deleted ${resource.name} record not found.`,
+        }),
+        404
+      );
+    }
+    return c.json(createSuccessResponse({ id: item.id, permanentlyDeleted: true }), 200);
   });
 }

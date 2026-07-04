@@ -1,27 +1,11 @@
-import {
-  brands,
-  categories,
-  db,
-  productImages,
-  products,
-  productVariants,
-  subcategories,
-  variantAttributes,
-} from "@ikyomm/database";
-import { and, asc, desc, eq, exists, ilike, or } from "drizzle-orm";
+import { brands, categories, db, products, productVariants, subcategories } from "@ikyomm/database";
+import { and, asc, desc, eq, exists, ilike, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { productListQuerySchema } from "./schema";
 
-const productWithImages = {
-  images: {
-    where: eq(productImages.isDeleted, false),
-    orderBy: [asc(productImages.sortOrder)],
-  },
-} as const;
-
 type ProductListQuery = z.output<typeof productListQuerySchema>;
 
-export function fetchProductsWithImages(input: ProductListQuery) {
+export function fetchProducts(input: ProductListQuery) {
   const conditions = [eq(products.isDeleted, false)];
 
   if (input.search) {
@@ -41,23 +25,27 @@ export function fetchProductsWithImages(input: ProductListQuery) {
     conditions.push(eq(products.isHeroProduct, input.isHeroProduct));
   }
   if (input.attributeName || input.attributeValue) {
+    const attributeCondition =
+      input.attributeName && input.attributeValue
+        ? sql`${productVariants.attributes} ->> ${input.attributeName} = ${input.attributeValue}`
+        : input.attributeName
+          ? sql`${productVariants.attributes} ? ${input.attributeName}`
+          : sql`exists (
+              select 1
+              from jsonb_each_text(${productVariants.attributes}) as attribute
+              where attribute.value = ${input.attributeValue}
+            )`;
+
     conditions.push(
       exists(
         db
-          .select({ id: variantAttributes.id })
+          .select({ id: productVariants.id })
           .from(productVariants)
-          .innerJoin(variantAttributes, eq(variantAttributes.variantId, productVariants.id))
           .where(
             and(
               eq(productVariants.productId, products.id),
               eq(productVariants.isDeleted, false),
-              eq(variantAttributes.isDeleted, false),
-              input.attributeName
-                ? eq(variantAttributes.attributeName, input.attributeName)
-                : undefined,
-              input.attributeValue
-                ? eq(variantAttributes.attributeValue, input.attributeValue)
-                : undefined
+              attributeCondition
             )
           )
       )
@@ -66,17 +54,15 @@ export function fetchProductsWithImages(input: ProductListQuery) {
 
   return db.query.products.findMany({
     where: and(...conditions),
-    with: productWithImages,
     orderBy: [desc(products.createdAt)],
     limit: input.limit,
     offset: input.offset,
   });
 }
 
-export function findProductWithImages(id: string) {
+export function findProduct(id: string) {
   return db.query.products.findFirst({
     where: and(eq(products.id, id), eq(products.isDeleted, false)),
-    with: productWithImages,
   });
 }
 
@@ -102,19 +88,17 @@ export async function fetchProductFilterOptions() {
       .from(subcategories)
       .where(and(eq(subcategories.isDeleted, false), eq(subcategories.status, "ACTIVE")))
       .orderBy(asc(subcategories.name)),
-    db
-      .select({
-        name: variantAttributes.attributeName,
-        value: variantAttributes.attributeValue,
-      })
-      .from(variantAttributes)
-      .where(eq(variantAttributes.isDeleted, false))
-      .groupBy(variantAttributes.attributeName, variantAttributes.attributeValue)
-      .orderBy(asc(variantAttributes.attributeName), asc(variantAttributes.attributeValue)),
+    db.execute<{ name: string; value: string }>(sql`
+      select distinct attribute.key as name, attribute.value
+      from ${productVariants}
+      cross join lateral jsonb_each_text(${productVariants.attributes}) as attribute
+      where ${productVariants.isDeleted} = false
+      order by attribute.key, attribute.value
+    `),
   ]);
 
   const attributeMap = new Map<string, string[]>();
-  for (const attribute of attributeRows) {
+  for (const attribute of attributeRows.rows) {
     const values = attributeMap.get(attribute.name) ?? [];
     values.push(attribute.value);
     attributeMap.set(attribute.name, values);

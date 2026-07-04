@@ -11,5 +11,13 @@ export const categoryResources: CrudResourceConfig[] = [
     ...categorySchemas,
     publicRead: true,
     staffWrite: true,
+    permissionResource: "treasure_categories",
+    searchColumns: [categories.name, categories.slug, categories.description],
+    sortColumns: {
+      name: categories.name,
+      slug: categories.slug,
+      createdAt: categories.createdAt,
+      updatedAt: categories.updatedAt,
+    },
   },
 ];

@@ -18,18 +18,17 @@ export const warehouses = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    code: text("code").notNull(),
     addressLine1: text("address_line_1").notNull(),
     addressLine2: text("address_line_2"),
     city: text("city").notNull(),
     state: text("state").notNull(),
-    country: text("country").default("India").notNull(),
+    country: text("country").default("IN").notNull(),
     pincode: text("pincode").notNull(),
     status: WarehouseStatus("status").default("ACTIVE").notNull(),
     ...referenceColumns((): AnyPgColumn => user.id),
   },
   (table) => [
-    uniqueIndex("treasure_warehouses_code_uidx").on(table.code),
+    uniqueIndex("treasure_warehouses_name_uidx").on(table.name),
     index("treasure_warehouses_status_idx").on(table.status),
   ]
 );
@@ -43,7 +42,7 @@ export const inventory = pgTable(
       .references(() => productVariants.id, { onDelete: "cascade" }),
     warehouseId: text("warehouse_id")
       .notNull()
-      .references(() => warehouses.id, { onDelete: "cascade" }),
+      .references(() => warehouses.id, { onDelete: "restrict" }),
     quantityAvailable: integer("quantity_available").default(0).notNull(),
     reservedQuantity: integer("reserved_quantity").default(0).notNull(),
     lowStockThreshold: integer("low_stock_threshold").default(0).notNull(),
@@ -61,3 +60,14 @@ export const inventory = pgTable(
     ),
   ]
 );
+
+// quantityAvailable: Total physical stock currently held.
+
+// reservedQuantity: Stock temporarily allocated to pending/confirmed orders but not yet shipped. It cannot exceed quantityAvailable.
+
+// lowStockThreshold: Minimum stock level used to trigger a low-stock warning.
+// quantityAvailable = 100
+// reservedQuantity = 20
+// sellable stock = 80
+// lowStockThreshold = 15
+// quantityAvailable - reservedQuantity <= lowStockThreshold

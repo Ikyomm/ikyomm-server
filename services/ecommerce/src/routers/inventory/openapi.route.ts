@@ -10,6 +10,13 @@ export const inventoryResources: CrudResourceConfig[] = [
     table: warehouses,
     ...warehouseSchemas,
     staffWrite: true,
+    permissionResource: "treasure_warehouses",
+    searchColumns: [warehouses.name, warehouses.city, warehouses.state, warehouses.pincode],
+    sortColumns: {
+      name: warehouses.name,
+      createdAt: warehouses.createdAt,
+      updatedAt: warehouses.updatedAt,
+    },
   },
   {
     name: "inventory records",
@@ -18,5 +25,6 @@ export const inventoryResources: CrudResourceConfig[] = [
     table: inventory,
     ...inventorySchemas,
     staffWrite: true,
+    permissionResource: "treasure_inventory",
   },
 ];

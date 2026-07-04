@@ -11,5 +11,13 @@ export const subcategoryResources: CrudResourceConfig[] = [
     ...subcategorySchemas,
     publicRead: true,
     staffWrite: true,
+    permissionResource: "treasure_subcategories",
+    searchColumns: [subcategories.name, subcategories.slug, subcategories.description],
+    sortColumns: {
+      name: subcategories.name,
+      slug: subcategories.slug,
+      createdAt: subcategories.createdAt,
+      updatedAt: subcategories.updatedAt,
+    },
   },
 ];

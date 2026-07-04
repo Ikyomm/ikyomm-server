@@ -1,12 +1,4 @@
-import {
-  brands,
-  categories,
-  productImages,
-  products,
-  productVariants,
-  subcategories,
-  variantAttributes,
-} from "@ikyomm/database";
+import { brands, categories, products, productVariants, subcategories } from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createDbInsertSchema, createDbSelectSchema, createDbUpdateSchema } from "@ikyomm/utils";
 
@@ -35,20 +27,7 @@ export const productVariantSchemas = {
   insertSchema: createDbInsertSchema(productVariants, { omit }),
   updateSchema: createDbUpdateSchema(productVariants, { omit }),
 };
-export const productImageSchemas = {
-  selectSchema: createDbSelectSchema(productImages),
-  insertSchema: createDbInsertSchema(productImages, { omit }),
-  updateSchema: createDbUpdateSchema(productImages, { omit }),
-};
-export const variantAttributeSchemas = {
-  selectSchema: createDbSelectSchema(variantAttributes),
-  insertSchema: createDbInsertSchema(variantAttributes, { omit }),
-  updateSchema: createDbUpdateSchema(variantAttributes, { omit }),
-};
-
-export const productWithImagesSchema = productSchemas.selectSchema.extend({
-  images: z.array(productImageSchemas.selectSchema),
-});
+export const productWithImagesSchema = productSchemas.selectSchema;
 
 const optionalBooleanQuerySchema = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
@@ -92,9 +71,5 @@ export const productDetailsSchema = productWithImagesSchema.extend({
   brand: brandSelectSchema,
   category: categorySelectSchema,
   subcategory: subcategorySelectSchema,
-  variants: z.array(
-    productVariantSchemas.selectSchema.extend({
-      attributes: z.array(variantAttributeSchemas.selectSchema),
-    })
-  ),
+  variants: z.array(productVariantSchemas.selectSchema),
 });

@@ -1,18 +1,16 @@
-import { productImages, products, productVariants, variantAttributes } from "@ikyomm/database";
+import { products, productVariants } from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createApiSuccessResponse, createOpenApiRoute } from "@ikyomm/utils";
 import type { CrudResourceConfig } from "../shared/crud";
 import {
   productDetailsSchema,
-  productImageSchemas,
   productFilterOptionsSchema,
   productListQuerySchema,
   productSchemas,
   productVariantSchemas,
   productWithImagesSchema,
-  variantAttributeSchemas,
 } from "./schema";
-import { fetchProductsWithImages, findProductWithImages } from "./list";
+import { fetchProducts, findProduct } from "./list";
 
 export const productFilterOptionsRoute = createOpenApiRoute({
   method: "get",
@@ -33,7 +31,7 @@ export const productDetailsRoute = createOpenApiRoute({
   path: "/products/{id}/details",
   operationId: "productGetDetailsById",
   tags: ["Products"],
-  summary: "Get a product with brand, category, subcategory, variants, attributes, and images",
+  summary: "Get a product with brand, category, subcategory, variants, and embedded images",
   request: { params: z.object({ id: z.string().min(1) }) },
   responses: {
     200: createApiSuccessResponse(productDetailsSchema, "Product details fetched successfully"),
@@ -50,10 +48,11 @@ export const productResources: CrudResourceConfig[] = [
     selectSchema: productWithImagesSchema,
     publicRead: true,
     staffWrite: true,
+    permissionResource: "treasure_products",
     listQuerySchema: productListQuerySchema,
-    listLoader: ({ query }) => fetchProductsWithImages(productListQuerySchema.parse(query)),
-    detailLoader: ({ id }) => findProductWithImages(id),
-    hydrateRecord: findProductWithImages,
+    listLoader: ({ query }) => fetchProducts(productListQuerySchema.parse(query)),
+    detailLoader: ({ id }) => findProduct(id),
+    hydrateRecord: findProduct,
   },
   {
     name: "product variants",
@@ -63,23 +62,12 @@ export const productResources: CrudResourceConfig[] = [
     ...productVariantSchemas,
     publicRead: true,
     staffWrite: true,
-  },
-  {
-    name: "product images",
-    path: "product-images",
-    tag: "Product Images",
-    table: productImages,
-    ...productImageSchemas,
-    publicRead: true,
-    staffWrite: true,
-  },
-  {
-    name: "variant attributes",
-    path: "variant-attributes",
-    tag: "Variant Attributes",
-    table: variantAttributes,
-    ...variantAttributeSchemas,
-    publicRead: true,
-    staffWrite: true,
+    permissionResource: "treasure_product_variants",
+    searchColumns: [productVariants.sku, productVariants.name, productVariants.size],
+    sortColumns: {
+      name: productVariants.name,
+      createdAt: productVariants.createdAt,
+      updatedAt: productVariants.updatedAt,
+    },
   },
 ];
