@@ -4,13 +4,10 @@ export type UserFields = {
   input: boolean;
   required?: boolean;
   fieldName?: string;
+  defaultValue?: string | number | boolean | string[] | Record<string, unknown>;
 };
+
 export const userFields: UserFields[] = [
-  {
-    name: "role",
-    type: "string",
-    input: false,
-  },
   {
     name: "panel",
     type: "string",
@@ -20,35 +17,49 @@ export const userFields: UserFields[] = [
     name: "metadata",
     type: "json",
     input: true,
+    required: false,
   },
   {
     name: "employeeId",
     type: "string",
     input: false,
+    required: false,
   },
   {
     name: "employeeEmail",
     type: "string",
     input: false,
+    required: false,
   },
   {
     name: "country",
     type: "string",
     input: false,
+    required: false,
   },
   {
     name: "state",
     type: "string",
     input: false,
+    required: false,
   },
   {
     name: "city",
     type: "string",
     input: false,
-  },
-  {
-    name: "address",
-    type: "string",
-    input: false,
+    required: false,
   },
 ];
+
+export const userAdditionalFields = Object.fromEntries(
+  userFields.map((field) => [
+    field.name,
+    {
+      type: field.type,
+      input: field.input,
+      required: field.required,
+      fieldName: field.fieldName,
+      defaultValue: field.defaultValue,
+    },
+  ])
+);

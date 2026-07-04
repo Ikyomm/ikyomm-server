@@ -18,6 +18,7 @@ import {
 } from "@ikyomm/notification";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
+import { userAdditionalFields } from "./fields/user";
 import {
   getBetterAuthConfigState,
   normalizeBasePath,
@@ -27,7 +28,7 @@ import {
   resolveAuthSecondaryStorage,
 } from "./utils";
 import { generateRandomId, generateUID, PasswordUtils } from "@ikyomm/utils";
-import { allowCustomInputFieldsPlugin, emailOtpGuardPlugin } from "./plugin";
+import { emailOtpGuardPlugin } from "./plugin";
 import { and, eq, isNull } from "drizzle-orm";
 
 // ─────────────────────────────────────────────
@@ -42,6 +43,38 @@ const {
   isProduction,
   trustedOrigins,
 } = getBetterAuthConfigState();
+
+type PhoneOtpPayload = {
+  phoneNumber: string;
+  code: string;
+};
+
+type PhoneVerificationPayload = {
+  phoneNumber: string;
+  user: {
+    id: string;
+  };
+};
+
+type AuthSessionPayload = {
+  session: Record<string, unknown> & {
+    activeOrganizationId?: string | null;
+  };
+  user: Record<string, unknown> & {
+    id: string;
+    banned?: boolean | null;
+    banReason?: string | null;
+    role?: string | null;
+    panel?: string | null;
+    metadata?: schema.UserMetadata | null;
+  };
+};
+
+type VerificationOtpPayload = {
+  email: string;
+  otp: string;
+  type: string;
+};
 
 // ─────────────────────────────────────────────
 // Auth instance factory
@@ -96,6 +129,9 @@ async function createAuthInstance() {
       sendOnSignUp: false,
       autoSignInAfterVerification: true,
     },
+    user: {
+      additionalFields: userAdditionalFields,
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // 24 hours
@@ -116,10 +152,10 @@ async function createAuthInstance() {
         expiresIn: 60 * 5,
         requireVerification: false,
         allowedAttempts: 5,
-        sendOTP: ({ phoneNumber, code }) => {
+        sendOTP: ({ phoneNumber, code }: PhoneOtpPayload) => {
           logger.info("Sending OTP", { phoneNumber, code });
         },
-        callbackOnVerification: async ({ phoneNumber, user }) => {
+        callbackOnVerification: async ({ phoneNumber, user }: PhoneVerificationPayload) => {
           logger.info("Phone number verified", {
             phoneNumber,
             userId: user.id,
@@ -143,8 +179,7 @@ async function createAuthInstance() {
       admin({
         defaultRole: "user",
       }),
-      allowCustomInputFieldsPlugin,
-      customSession(async ({ session, user }) => {
+      customSession(async ({ session, user }: AuthSessionPayload) => {
         const sessionWithOrganization = session as typeof session & {
           activeOrganizationId?: string | null;
         };
@@ -300,7 +335,7 @@ async function createAuthInstance() {
         allowedAttempts: 5,
         storeOTP: "hashed",
         overrideDefaultEmailVerification: false,
-        async sendVerificationOTP({ email, otp, type }) {
+        async sendVerificationOTP({ email, otp, type }: VerificationOtpPayload) {
           const [emailUser] = await db
             .select({
               panel: schema.user.panel,
@@ -357,7 +392,6 @@ async function createAuthInstance() {
       level: isProduction ? "info" : "debug",
       disabled: false,
     },
-    experimental: { joins: true },
     databaseHooks: {
       user: {
         create: {
@@ -432,7 +466,6 @@ async function createAuthInstance() {
               country: schema.user.country,
               state: schema.user.state,
               city: schema.user.city,
-              address: schema.user.address,
             })
             .from(schema.user)
             .leftJoin(schema.member, eq(schema.user.id, schema.member.userId))

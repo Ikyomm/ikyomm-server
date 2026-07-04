@@ -3,33 +3,7 @@ import { APIError } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
 import { eq } from "drizzle-orm";
 import * as schema from "@ikyomm/database";
-import { type UserFields, userFields } from "./fields/user";
 import { resolveAuthDatabase, resolveEmailExistsCache } from "./utils";
-
-// ─────────────────────────────────────────────
-// Allow Custom Input Fields Plugin
-// ─────────────────────────────────────────────
-
-export const allowCustomInputFieldsPlugin = {
-  id: "allow-custom-input-fields",
-  schema: {
-    user: {
-      fields: Array.isArray(userFields)
-        ? Object.fromEntries(
-            userFields.map((field: UserFields) => [
-              field.name,
-              {
-                type: field.type,
-                input: field.input,
-                required: field.required,
-                fieldName: field.fieldName,
-              },
-            ])
-          )
-        : userFields,
-    },
-  },
-} satisfies BetterAuthPlugin;
 
 // ─────────────────────────────────────────────
 // Email OTP Guard Plugin
