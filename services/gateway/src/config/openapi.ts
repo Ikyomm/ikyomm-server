@@ -7,7 +7,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     title: "Gateway Service API",
     version: "1.0.0",
     description:
-      "Ommpods API gateway service. This service handles gateway-level operations and proxies requests to downstream auth, kernel, company, and Ommpods services.",
+      "Ommpods API gateway service. This service handles gateway-level operations and proxies requests to downstream auth, kernel, company, Ommpods, and ecommerce services.",
   },
   tags: [
     {
@@ -30,6 +30,10 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     {
       name: "Ommpods Service (Proxied)",
       description: "Ommpods service scope exposed through gateway under /api/ommpods.",
+    },
+    {
+      name: "Ecommerce Service (Proxied)",
+      description: "Ecommerce service scope exposed through gateway under /api/ecommerce.",
     },
   ],
 };

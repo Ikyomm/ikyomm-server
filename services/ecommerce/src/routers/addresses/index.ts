@@ -1,0 +1,1 @@
+export { addressesGroup } from "./handler";

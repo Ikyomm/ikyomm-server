@@ -1,0 +1,1 @@
+export { reviewsGroup } from "./handler";

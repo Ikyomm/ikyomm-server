@@ -1,0 +1,1 @@
+export { subcategoriesGroup } from "./handler";

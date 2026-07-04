@@ -1,0 +1,1 @@
+export { brandsGroup } from "./handler";

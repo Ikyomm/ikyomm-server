@@ -1,0 +1,1 @@
+export { productsGroup } from "./handler";

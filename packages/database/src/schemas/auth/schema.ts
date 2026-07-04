@@ -38,7 +38,6 @@ export const user = pgTable(
     country: text("country"),
     state: text("state"),
     city: text("city"),
-    address: text("address"),
 
     // Corporate Details
     company: text("company").references((): AnyPgColumn => organization.id, {

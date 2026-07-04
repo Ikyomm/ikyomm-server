@@ -260,6 +260,20 @@
       "when": 1781677870332,
       "tag": "0036_ancient_wendell_vaughn",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783077523795,
+      "tag": "0037_chilly_proteus",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783077642108,
+      "tag": "0038_glossy_tempest",
+      "breakpoints": true
     }
   ]
 }

@@ -4,4 +4,5 @@ export * from "./auth";
 export * from "./location";
 export * from "./records";
 export * from "./sessions";
+export * from "./treasure";
 export * from "./wallets";

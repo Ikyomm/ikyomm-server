@@ -12,6 +12,7 @@ export const proxyRoutes: ProxyRoute[] = [
   { prefix: "/api/kernel", target: env.KERNEL_SERVICE_URL, stripPrefix: true },
   { prefix: "/api/company", target: env.COMPANY_SERVICE_URL, stripPrefix: true },
   { prefix: "/api/ommpods", target: env.OMMPODS_SERVICE_URL, stripPrefix: true },
+  { prefix: "/api/ecommerce", target: env.ECOMMERCE_SERVICE_URL, stripPrefix: true },
 ];
 
 export function createUpstreamUrl(requestUrl: string, route: ProxyRoute) {

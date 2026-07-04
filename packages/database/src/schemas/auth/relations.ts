@@ -3,6 +3,10 @@ import { createAuditRelationNames } from "../utils/audit";
 import { account, invitation, member, organization, session, user } from "./schema";
 import { rbacRole } from "./rbac/schema";
 import { region, zone, zoneLocation } from "../location";
+import { addresses } from "../treasure/addresses/schema";
+import { orders } from "../treasure/orders/schema";
+import { reviews } from "../treasure/reviews/schema";
+import { subscriptions } from "../treasure/subscriptions/schema";
 
 const memberUserRelationName = "memberUser";
 const userCompanyRelationName = "userCompanyOrganization";
@@ -36,6 +40,10 @@ export const userRelations = relations(user, ({ many, one }) => {
       relationName: userCompanyRelationName,
     }),
     invitations: many(invitation),
+    addresses: many(addresses),
+    orders: many(orders),
+    subscriptions: many(subscriptions),
+    reviews: many(reviews),
     createdUsers: many(user, {
       relationName: auditRelations.user.created,
     }),

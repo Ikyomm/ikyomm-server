@@ -38,6 +38,9 @@ export const env = createEnv({
     OMMPODS_SERVICE_URL: z.url(
       "OMMPODS_SERVICE_URL must be a valid URL — e.g. http://ommpods:6007"
     ),
+    ECOMMERCE_SERVICE_URL: z.url(
+      "ECOMMERCE_SERVICE_URL must be a valid URL — e.g. http://ecommerce:6008"
+    ),
   },
 
   runtimeEnv: {
@@ -50,6 +53,7 @@ export const env = createEnv({
     KERNEL_SERVICE_URL: process.env.KERNEL_SERVICE_URL,
     COMPANY_SERVICE_URL: process.env.COMPANY_SERVICE_URL,
     OMMPODS_SERVICE_URL: process.env.OMMPODS_SERVICE_URL,
+    ECOMMERCE_SERVICE_URL: process.env.ECOMMERCE_SERVICE_URL,
   },
 
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",

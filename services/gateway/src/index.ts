@@ -54,6 +54,10 @@ app.get(
         title: "Ommpods Service",
         url: "/api/ommpods/doc",
       },
+      {
+        title: "Ecommerce Service",
+        url: "/api/ecommerce/doc",
+      },
     ],
   })
 );

@@ -1,0 +1,1 @@
+export { inventoryGroup } from "./handler";
