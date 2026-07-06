@@ -46,7 +46,6 @@ export const products = pgTable(
     collection: text("collection"),
     materialOrIngredients: text("material_or_ingredients"),
     countryOfOrigin: text("country_of_origin"),
-    targetCustomer: text("target_customer"),
     productType: ProductType("product_type").default("VARIABLE").notNull(),
     status: ProductStatus("status").default("DRAFT").notNull(),
     isHeroProduct: boolean("is_hero_product").default(false).notNull(),
@@ -84,7 +83,6 @@ export const productVariants = pgTable(
     name: text("name").notNull(),
     size: text("size"),
     weightGrams: real("weight_grams"),
-    estimatedCogs: real("estimated_cogs"),
     price: real("price").notNull(),
     currency: text("currency").default("INR").notNull(),
     packaging: text("packaging"),
@@ -94,14 +92,10 @@ export const productVariants = pgTable(
     ...referenceColumns((): AnyPgColumn => user.id),
   },
   (table) => [
-    uniqueIndex("treasure_product_variants_sku_uidx").on(table.sku),
+    uniqueIndex("treasure_product_variants_sku_uidx").on(sql`upper(${table.sku})`),
     index("treasure_product_variants_product_id_idx").on(table.productId),
     index("treasure_product_variants_status_idx").on(table.status),
     index("treasure_product_variants_stock_status_idx").on(table.stockStatus),
     check("treasure_product_variants_price_check", sql`${table.price} >= 0`),
-    check(
-      "treasure_product_variants_estimated_cogs_check",
-      sql`${table.estimatedCogs} is null or ${table.estimatedCogs} >= 0`
-    ),
   ]
 );

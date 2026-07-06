@@ -27,6 +27,14 @@ export const productVariantSchemas = {
   insertSchema: createDbInsertSchema(productVariants, { omit }),
   updateSchema: createDbUpdateSchema(productVariants, { omit }),
 };
+export const productVariantSkuAvailabilityQuerySchema = z.object({
+  sku: z.string().trim().min(4).max(100),
+  excludeId: z.string().trim().min(1).optional(),
+});
+export const productVariantSkuAvailabilitySchema = z.object({
+  sku: z.string(),
+  available: z.boolean(),
+});
 export const productWithImagesSchema = productSchemas.selectSchema;
 
 const optionalBooleanQuerySchema = z

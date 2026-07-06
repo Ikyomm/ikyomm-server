@@ -26,6 +26,7 @@ import {
 
 export type CrudBeforeCreate = (input: {
   body: Record<string, unknown>;
+  id?: string;
   userId: string;
 }) => Promise<string | null>;
 
@@ -389,7 +390,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     if (resource.ownerKey) delete body[resource.ownerKey];
 
     if (!userId) throw new Error("Authenticated user context is missing.");
-    const validationMessage = await resource.beforeUpdate?.({ body, userId });
+    const validationMessage = await resource.beforeUpdate?.({ body, id, userId });
     if (validationMessage) {
       return c.json(
         createErrorResponse({ error: "Unprocessable Entity", message: validationMessage }),

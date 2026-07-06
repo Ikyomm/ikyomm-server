@@ -1,8 +1,13 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createErrorResponse, createSuccessResponse, registerOpenApiRoute } from "@ikyomm/utils";
 import type { AppBindings } from "@/types/app";
-import { productDetailsRoute, productFilterOptionsRoute } from "./openapi.route";
+import {
+  productDetailsRoute,
+  productFilterOptionsRoute,
+  productVariantSkuAvailabilityRoute,
+} from "./openapi.route";
 import { fetchProductFilterOptions } from "./list";
+import { isProductVariantSkuAvailable, normalizeProductVariantSku } from "./sku";
 import { findProductDetails, registerProductResources } from "./utils";
 
 export const productsGroup = new OpenAPIHono<AppBindings>();
@@ -10,6 +15,18 @@ export const productsGroup = new OpenAPIHono<AppBindings>();
 registerOpenApiRoute(productsGroup, productFilterOptionsRoute, async (c) =>
   c.json(createSuccessResponse(await fetchProductFilterOptions()), 200)
 );
+
+registerOpenApiRoute(productsGroup, productVariantSkuAvailabilityRoute, async (c) => {
+  const { excludeId, sku } = c.req.valid("query");
+  const normalizedSku = normalizeProductVariantSku(sku);
+  return c.json(
+    createSuccessResponse({
+      sku: normalizedSku,
+      available: await isProductVariantSkuAvailable(normalizedSku, excludeId),
+    }),
+    200
+  );
+});
 
 registerProductResources(productsGroup);
 

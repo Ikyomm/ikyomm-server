@@ -2,15 +2,35 @@ import { products, productVariants } from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createApiSuccessResponse, createOpenApiRoute } from "@ikyomm/utils";
 import type { CrudResourceConfig } from "../shared/crud";
+import { ecommerceAuthMiddleware } from "../shared/auth";
 import {
   productDetailsSchema,
   productFilterOptionsSchema,
   productListQuerySchema,
   productSchemas,
+  productVariantSkuAvailabilityQuerySchema,
+  productVariantSkuAvailabilitySchema,
   productVariantSchemas,
   productWithImagesSchema,
 } from "./schema";
 import { fetchProducts, findProduct } from "./list";
+import { validateProductVariantSku } from "./sku";
+
+export const productVariantSkuAvailabilityRoute = createOpenApiRoute({
+  method: "get",
+  path: "/product-variants/sku-availability",
+  operationId: "productVariantSkuAvailability",
+  tags: ["Product Variants"],
+  middleware: [ecommerceAuthMiddleware],
+  summary: "Check whether a product variant SKU is available",
+  request: { query: productVariantSkuAvailabilityQuerySchema },
+  responses: {
+    200: createApiSuccessResponse(
+      productVariantSkuAvailabilitySchema,
+      "Product variant SKU checked successfully"
+    ),
+  },
+});
 
 export const productFilterOptionsRoute = createOpenApiRoute({
   method: "get",
@@ -63,6 +83,8 @@ export const productResources: CrudResourceConfig[] = [
     publicRead: true,
     staffWrite: true,
     permissionResource: "treasure_product_variants",
+    beforeCreate: validateProductVariantSku,
+    beforeUpdate: validateProductVariantSku,
     searchColumns: [productVariants.sku, productVariants.name, productVariants.size],
     sortColumns: {
       name: productVariants.name,
