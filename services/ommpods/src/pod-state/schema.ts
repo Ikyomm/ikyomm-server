@@ -1,6 +1,6 @@
-import { z } from "@hono/zod-openapi";
+import { z } from "zod";
 
-export const pollingResponseSchema = z.object({
+export const podStateSchema = z.object({
   podData: z.object({
     connectedDeviceConfig: z.array(
       z.object({
@@ -53,4 +53,4 @@ export const pollingResponseSchema = z.object({
     .nullable(),
 });
 
-export type PollingResponse = z.infer<typeof pollingResponseSchema>;
+export type PodState = z.infer<typeof podStateSchema>;

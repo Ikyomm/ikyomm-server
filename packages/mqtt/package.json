@@ -1,0 +1,35 @@
+{
+  "name": "@ikyomm/mqtt",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup --config ../../tsup.config.ts",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome lint --write ./src",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "mqtt": "^5.15.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@ikyomm/typescript-config": "workspace:*",
+    "@types/node": "^25.9.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

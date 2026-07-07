@@ -27,6 +27,10 @@ const corsOriginsSchema = z
     message: "CORS_ALLOWED_ORIGINS must contain at least one origin",
   });
 
+const booleanStringSchema = z
+  .enum(["true", "false", "1", "0"])
+  .transform((value) => value === "true" || value === "1");
+
 export const env = createEnv({
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]),
@@ -42,6 +46,13 @@ export const env = createEnv({
       .min(16, "BETTER_AUTH_SECRET must be at least 16 characters long"),
     SESSION_START_END_DELAY_SECONDS: z.coerce.number().int().min(0).default(20),
     SESSION_START_INTRODUCTORY_VIDEO_DURATION: z.coerce.number().int().min(0).default(30),
+    MQTT_ENABLED: booleanStringSchema.default(false),
+    MQTT_SERVER: z.string().min(1).default("172.105.41.17"),
+    MQTT_PORT: z.coerce.number().int().min(1).max(65_535).default(1883),
+    MQTT_WS_PORT: z.coerce.number().int().min(1).max(65_535).default(9001),
+    MQTT_CLIENT_ID_PREFIX: z.string().min(1).default("ommpods-service"),
+    MQTT_STATUS_TOPIC: z.string().min(1).default("ommpod/pod/status"),
+    MQTT_QOS: z.coerce.number().int().min(0).max(2).default(1),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -56,6 +67,13 @@ export const env = createEnv({
     SESSION_START_END_DELAY_SECONDS: process.env.OMMPODS_SESSION_START_END_DELAY_SECONDS,
     SESSION_START_INTRODUCTORY_VIDEO_DURATION:
       process.env.OMMPODS_SESSION_START_INTRODUCTORY_VIDEO_DURATION,
+    MQTT_ENABLED: process.env.OMMPODS_MQTT_ENABLED,
+    MQTT_SERVER: process.env.OMMPODS_MQTT_SERVER,
+    MQTT_PORT: process.env.OMMPODS_MQTT_PORT,
+    MQTT_WS_PORT: process.env.OMMPODS_MQTT_WS_PORT,
+    MQTT_CLIENT_ID_PREFIX: process.env.OMMPODS_MQTT_CLIENT_ID_PREFIX,
+    MQTT_STATUS_TOPIC: process.env.OMMPODS_MQTT_STATUS_TOPIC,
+    MQTT_QOS: process.env.OMMPODS_MQTT_QOS,
   },
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
   onValidationError(issues) {

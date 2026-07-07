@@ -21,6 +21,7 @@
     "@hono/zod-openapi": "^1.4.0",
     "@ikyomm/database": "workspace:*",
     "@ikyomm/logger": "workspace:*",
+    "@ikyomm/mqtt": "workspace:*",
     "@ikyomm/utils": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
     "hono": "^4.12.25",

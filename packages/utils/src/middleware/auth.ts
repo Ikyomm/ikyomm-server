@@ -10,7 +10,7 @@ import {
 } from "@ikyomm/database";
 import { and, eq, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
-import type { Context, ContextVariableMap, MiddlewareHandler } from "hono";
+import type { Context, ContextVariableMap, MiddlewareHandler, Next } from "hono";
 import { env } from "../env";
 import { AUTH_SESSION_FORWARD_HEADERS } from "../functions/network";
 import { AUTH_MIDDLEWARE_REDIS_NAMESPACE, getRedisClient } from "../redis";
@@ -1171,7 +1171,7 @@ export function createBetterAuthSessionMiddleware(
   const entityOptions = resolveEntityOptions(options.entities, requiredEntities);
   const entityScopeKey = buildEntityScopeKey(entityOptions);
 
-  return async (c, next) => {
+  return async (c: Context, next: Next) => {
     if (shouldSkipPath(c.req.path, skipPaths)) {
       await next();
       return;

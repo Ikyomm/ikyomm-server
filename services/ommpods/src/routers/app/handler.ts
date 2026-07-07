@@ -1,5 +1,5 @@
 import type { AppBindings } from "@/types/app";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { createOpenApiHono } from "@/lib/openapi-hono";
 import type { Context } from "hono";
 import {
   OmmPodType,
@@ -25,7 +25,7 @@ import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { buildSessionResponse, hydratePodAromaDefusers } from "../shared";
 
-export const appGroup = new OpenAPIHono<AppBindings>();
+export const appGroup = createOpenApiHono<AppBindings>();
 
 const appAuthMiddleware = createRequiredAuthSessionMiddleware({
   entities: {
@@ -108,7 +108,7 @@ function serializeAppPod(pod: AppPod) {
   };
 }
 
-appGroup.get("/me", async (c) => {
+appGroup.get("/me", async (c: Context<AppBindings>) => {
   const { user: currentUser } = getBetterAuthContext(c);
 
   if (!currentUser) {
@@ -190,7 +190,7 @@ appGroup.get("/me", async (c) => {
   );
 });
 
-appGroup.get("/sessions/active", async (c) => {
+appGroup.get("/sessions/active", async (c: Context<AppBindings>) => {
   const { user: currentUser } = getBetterAuthContext(c);
 
   if (!currentUser) {
@@ -233,7 +233,7 @@ appGroup.get("/sessions/active", async (c) => {
   );
 });
 
-appGroup.get("/pods/:id", async (c) => {
+appGroup.get("/pods/:id", async (c: Context<AppBindings>) => {
   const podId = c.req.param("id");
   const podRecord = await db.query.pods.findFirst({
     where: and(eq(pods.id, podId), eq(pods.isDeleted, false)),
@@ -247,7 +247,7 @@ appGroup.get("/pods/:id", async (c) => {
   return c.json(createSuccessResponse(serializeAppPod(pod)), 200);
 });
 
-appGroup.get("/moods/list", async (c) => {
+appGroup.get("/moods/list", async (c: Context<AppBindings>) => {
   const podType = c.req.query("podType");
   const isKnownPodType = (value: string): value is (typeof OmmPodType.enumValues)[number] =>
     OmmPodType.enumValues.includes(value as (typeof OmmPodType.enumValues)[number]);
@@ -267,7 +267,7 @@ appGroup.get("/moods/list", async (c) => {
   return c.json(createSuccessResponse(moods), 200);
 });
 
-appGroup.get("/playlists/list", async (c) => {
+appGroup.get("/playlists/list", async (c: Context<AppBindings>) => {
   const moodPresetId = c.req.query("moodPresetId");
   const moodPreset = moodPresetId
     ? await db.query.podMoodPresets.findFirst({
@@ -291,7 +291,7 @@ appGroup.get("/playlists/list", async (c) => {
   return c.json(createSuccessResponse(playlists), 200);
 });
 
-appGroup.get("/musics/list", async (c) => {
+appGroup.get("/musics/list", async (c: Context<AppBindings>) => {
   const playlistId = c.req.query("playlistId");
 
   if (!playlistId) {

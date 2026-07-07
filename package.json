@@ -11,7 +11,7 @@
     "build:company": "turbo run build --filter=@ikyomm/company",
     "build:ommpods": "turbo run build --filter=@ikyomm/ommpods",
     "build:ecommerce": "turbo run build --filter=@ikyomm/ecommerce",
-    "dev:build-deps": "pnpm --filter @ikyomm/logger run build && pnpm --filter @ikyomm/database run build && pnpm --filter @ikyomm/static run build && pnpm --filter @ikyomm/utils run build && pnpm --filter @ikyomm/notification run build",
+    "dev:build-deps": "pnpm --filter @ikyomm/logger run build && pnpm --filter @ikyomm/mqtt run build && pnpm --filter @ikyomm/database run build && pnpm --filter @ikyomm/static run build && pnpm --filter @ikyomm/utils run build && pnpm --filter @ikyomm/notification run build",
     "dev": "turbo run dev --filter=@ikyomm/gateway --filter=@ikyomm/auth --filter=@ikyomm/kernel --filter=@ikyomm/company --filter=@ikyomm/ommpods --filter=@ikyomm/ecommerce",
     "dev:email": "pnpm --filter @ikyomm/notification run email:dev",
     "lint": "turbo run lint",

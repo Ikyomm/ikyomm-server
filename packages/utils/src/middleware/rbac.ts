@@ -1,5 +1,5 @@
 import type { DatabaseResource } from "@ikyomm/database";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler, Next } from "hono";
 import {
   createRequiredAuthSessionMiddleware,
   getBetterAuthContext,
@@ -172,7 +172,7 @@ export function hasPermission(
 export function createPermissionMiddleware(
   options: PermissionMiddlewareOptions
 ): MiddlewareHandler {
-  return async (c, next) => {
+  return async (c: Context, next: Next) => {
     const authContext = getBetterAuthContext(c);
 
     if (!authContext.isAuthenticated || !authContext.user) {
@@ -226,7 +226,7 @@ export function createRbacMiddleware(options: CreateRbacMiddlewareOptions): Midd
     ) as CreateBetterAuthSessionMiddlewareOptions["requiredEntities"],
   });
 
-  return async (c, next) => {
+  return async (c: Context, next: Next) => {
     let authPassed = false;
     const authResponse = await authMiddleware(c, async () => {
       authPassed = true;
@@ -307,7 +307,7 @@ export function createResourceRbacMiddleware(
     return middleware;
   };
 
-  return async (c, next) => {
+  return async (c: Context, next: Next) => {
     const method = c.req.method.toUpperCase() as keyof typeof actionMap;
     const resolvedAction = options.customAction ?? actionMap[method];
 

@@ -11,6 +11,7 @@ FROM base AS build-deps
 COPY .npmrc package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/database/package.json ./packages/database/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
+COPY packages/mqtt/package.json ./packages/mqtt/package.json
 COPY packages/static/package.json ./packages/static/package.json
 COPY packages/typescript-config/package.json ./packages/typescript-config/package.json
 COPY packages/utils/package.json ./packages/utils/package.json
@@ -21,9 +22,11 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 FROM base AS builder
 COPY --from=build-deps /app/node_modules /app/node_modules
 COPY --from=build-deps /app/services/ommpods/node_modules /app/services/ommpods/node_modules
+COPY --from=build-deps /app/packages/mqtt/node_modules /app/packages/mqtt/node_modules
 COPY tsup.config.ts /app/tsup.config.ts
 COPY packages/database /app/packages/database
 COPY packages/logger /app/packages/logger
+COPY packages/mqtt /app/packages/mqtt
 COPY packages/static /app/packages/static
 COPY packages/typescript-config /app/packages/typescript-config
 COPY packages/utils /app/packages/utils
@@ -31,6 +34,8 @@ COPY services/ommpods /app/services/ommpods
 WORKDIR /app
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
   cd /app/packages/logger \
+  && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
+  && cd /app/packages/mqtt \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \
   && cd /app/packages/database \
   && /app/node_modules/.bin/tsup --config ../../tsup.config.ts \

@@ -1,5 +1,5 @@
 import type { AppBindings } from "@/types/app";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { createOpenApiHono } from "@/lib/openapi-hono";
 import { db, podSessions } from "@ikyomm/database";
 import {
   createErrorResponse,
@@ -8,8 +8,9 @@ import {
   registerOpenApiRoute,
 } from "@ikyomm/utils";
 import { eq } from "drizzle-orm";
+import type { Context } from "hono";
+import { refreshPodStateForPod } from "@/pod-state";
 import { buildSessionResponse, findActiveSessionForUser } from "../shared";
-import { refreshPollingDataForPod } from "../polling/state";
 import { updateAromaRoute, updateMoodRoute } from "./openapi.route";
 import {
   appendSessionControlLog,
@@ -18,7 +19,7 @@ import {
   getAromaValidationError,
 } from "./utils";
 
-export const controlGroup = new OpenAPIHono<AppBindings>();
+export const controlGroup = createOpenApiHono<AppBindings>();
 
 controlGroup.use("*", controlAuthMiddleware);
 
@@ -68,7 +69,7 @@ registerOpenApiRoute(controlGroup, updateMoodRoute, async (c) => {
     },
     createdByUser: currentUser.id,
   });
-  await refreshPollingDataForPod(session.podId);
+  await refreshPodStateForPod(session.podId);
 
   return c.json(
     createSuccessResponse({
@@ -80,7 +81,7 @@ registerOpenApiRoute(controlGroup, updateMoodRoute, async (c) => {
   );
 });
 
-controlGroup.post("/emergency-unlock/sessions/:sessionId", async (c) => {
+controlGroup.post("/emergency-unlock/sessions/:sessionId", async (c: Context<AppBindings>) => {
   const sessionId = c.req.param("sessionId");
   const { user: currentUser } = getBetterAuthContext(c);
 
@@ -109,7 +110,7 @@ controlGroup.post("/emergency-unlock/sessions/:sessionId", async (c) => {
     })
     .where(eq(podSessions.id, sessionId))
     .returning();
-  await refreshPollingDataForPod(session.podId);
+  await refreshPodStateForPod(session.podId);
 
   return c.json(
     createSuccessResponse({
@@ -169,7 +170,7 @@ registerOpenApiRoute(controlGroup, updateAromaRoute, async (c) => {
     },
     createdByUser: currentUser.id,
   });
-  await refreshPollingDataForPod(session.podId);
+  await refreshPodStateForPod(session.podId);
 
   return c.json(
     createSuccessResponse({

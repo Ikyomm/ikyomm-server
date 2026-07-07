@@ -1,32 +1,30 @@
-import { readPollingDataFromRedis, refreshPollingDataForPod } from "../polling/state";
-import type { PollingResponse } from "../polling/schema";
+import { readPodStateFromRedis, refreshPodStateForPod, type PodState } from "@/pod-state";
 import { resolveSessionControlState } from "../shared";
 
 type SessionControlState = Awaited<ReturnType<typeof resolveSessionControlState>>;
 
-export type PodSocketState = PollingResponse &
-  Pick<SessionControlState, "moodPresetId" | "musicControl">;
+export type PodSocketState = PodState & Pick<SessionControlState, "moodPresetId" | "musicControl">;
 
 export async function buildPodSocketState(
   podId: string,
   options: { forceRefresh?: boolean } = {}
 ): Promise<PodSocketState> {
-  const pollingState = options.forceRefresh
-    ? await refreshPollingDataForPod(podId)
-    : ((await readPollingDataFromRedis(podId)) ?? (await refreshPollingDataForPod(podId)));
+  const podState = options.forceRefresh
+    ? await refreshPodStateForPod(podId)
+    : ((await readPodStateFromRedis(podId)) ?? (await refreshPodStateForPod(podId)));
 
-  if (!pollingState.session) {
+  if (!podState.session) {
     return {
-      ...pollingState,
+      ...podState,
       moodPresetId: null,
       musicControl: null,
     };
   }
 
-  const controlState = await resolveSessionControlState(pollingState.session.id);
+  const controlState = await resolveSessionControlState(podState.session.id);
 
   return {
-    ...pollingState,
+    ...podState,
     moodPresetId: controlState.moodPresetId,
     musicControl: controlState.musicControl,
   };

@@ -1,5 +1,6 @@
 import type { AppBindings } from "@/types/app";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { createOpenApiHono } from "@/lib/openapi-hono";
+import { refreshPodStateForPod } from "@/pod-state";
 import type { Context } from "hono";
 import { db, musicPlaylists, musics, podMoodPresets, podSessions } from "@ikyomm/database";
 import { createErrorResponse, createSuccessResponse } from "@ikyomm/utils";
@@ -17,10 +18,9 @@ import {
   getSessionStartEndDelaySeconds,
   hydratePodAromaDefusers,
 } from "../shared";
-import { refreshPollingDataForPod } from "../polling/state";
 import { buildPodSocketState } from "../socket/state";
 
-export const tabletGroup = new OpenAPIHono<AppBindings>();
+export const tabletGroup = createOpenApiHono<AppBindings>();
 
 const moodBodySchema = z.object({
   moodPresetId: z.string().trim().min(1),
@@ -182,7 +182,7 @@ function getBadRequest(c: Context<AppBindings>, message: string) {
   return c.json(createErrorResponse({ error: "Bad Request", message }), 400);
 }
 
-tabletGroup.get("/pods/:podId/state", async (c) => {
+tabletGroup.get("/pods/:podId/state", async (c: Context<AppBindings>) => {
   const podId = c.req.param("podId");
   const state = await buildTabletState(podId);
 
@@ -193,7 +193,7 @@ tabletGroup.get("/pods/:podId/state", async (c) => {
   return c.json(createSuccessResponse(state), 200);
 });
 
-tabletGroup.post("/pods/:podId/mood", async (c) => {
+tabletGroup.post("/pods/:podId/mood", async (c: Context<AppBindings>) => {
   const podId = c.req.param("podId");
   const body = moodBodySchema.safeParse(await c.req.json().catch(() => null));
 
@@ -230,7 +230,7 @@ tabletGroup.post("/pods/:podId/mood", async (c) => {
   return c.json(createSuccessResponse(await buildTabletState(podId, moodPreset.id)), 200);
 });
 
-tabletGroup.post("/pods/:podId/aroma", async (c) => {
+tabletGroup.post("/pods/:podId/aroma", async (c: Context<AppBindings>) => {
   const podId = c.req.param("podId");
   const body = aromaBodySchema.safeParse(await c.req.json().catch(() => null));
 
@@ -278,7 +278,7 @@ tabletGroup.post("/pods/:podId/aroma", async (c) => {
   return c.json(createSuccessResponse(await buildTabletState(podId)), 200);
 });
 
-tabletGroup.post("/pods/:podId/music", async (c) => {
+tabletGroup.post("/pods/:podId/music", async (c: Context<AppBindings>) => {
   const podId = c.req.param("podId");
   const body = musicBodySchema.safeParse(await c.req.json().catch(() => null));
 
@@ -328,7 +328,7 @@ tabletGroup.post("/pods/:podId/music", async (c) => {
   return c.json(createSuccessResponse(await buildTabletState(podId)), 200);
 });
 
-tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
+tabletGroup.post("/pods/:podId/emergency-unlock", async (c: Context<AppBindings>) => {
   const podId = c.req.param("podId");
   const now = new Date();
   const unlockWindowSeconds = Math.max(getSessionStartEndDelaySeconds(), 5);
@@ -386,7 +386,7 @@ tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
     );
   }
 
-  await refreshPollingDataForPod(podId);
+  await refreshPodStateForPod(podId);
 
   return c.json(
     createSuccessResponse({

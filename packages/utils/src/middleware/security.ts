@@ -2,7 +2,7 @@ import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import type { Context, Env, Hono } from "hono";
+import type { Context, Next } from "hono";
 import { requestId } from "hono/request-id";
 import {
   SECURITY_CORS_ALLOW_HEADERS,
@@ -11,7 +11,10 @@ import {
 } from "../functions/network";
 import { createGlobalRateLimit } from "./rate-limit";
 
-type AppLike<E extends Env = Env> = Pick<Hono<E>, "use" | "get">;
+type AppLike = {
+  use: (...args: unknown[]) => unknown;
+  get: (...args: unknown[]) => unknown;
+};
 
 export interface AppSecurityOptions {
   corsOrigins: string[];
@@ -36,7 +39,7 @@ function matchesPathPrefix(path: string, candidatePath: string) {
   return path === candidatePath || path.startsWith(`${candidatePath}/`);
 }
 
-export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSecurityOptions) {
+export function applyAppSecurity(app: AppLike, options: AppSecurityOptions) {
   const normalizedOrigins = options.corsOrigins
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
@@ -112,7 +115,7 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
       ),
   });
 
-  app.use("*", async (c, next) => {
+  app.use("*", async (c: Context, next: Next) => {
     const shouldSkipBodyLimit = skipBodyLimitPaths.some((skipPath) =>
       matchesPathPrefix(c.req.path, skipPath)
     );
@@ -129,7 +132,7 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
     return;
   }
 
-  app.use("*", async (c, next) => {
+  app.use("*", async (c: Context, next: Next) => {
     const method = c.req.method;
     if (!["POST", "PUT", "PATCH"].includes(method)) {
       await next();

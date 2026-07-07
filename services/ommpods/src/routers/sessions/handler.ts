@@ -1,5 +1,6 @@
 import type { AppBindings } from "@/types/app";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { createOpenApiHono } from "@/lib/openapi-hono";
+import { refreshPodStateForPod } from "@/pod-state";
 import {
   db,
   podMoodPresets,
@@ -43,9 +44,8 @@ import {
   restoreSessionRoute,
 } from "./schema";
 import { findPodSessionById, getPodSessionUsage } from "./utils";
-import { refreshPollingDataForPod } from "../polling/state";
 
-export const sessionsGroup = new OpenAPIHono<AppBindings>();
+export const sessionsGroup = createOpenApiHono<AppBindings>();
 
 const authMiddleware = createRequiredAuthSessionMiddleware({
   entities: {
@@ -123,7 +123,7 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
     );
   }
 
-  await refreshPollingDataForPod(result.session.podId);
+  await refreshPodStateForPod(result.session.podId);
 
   return c.json(
     createSuccessResponse({
@@ -434,7 +434,7 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
   }
 
   const responsePod = await findPodWithAromaDefuser(result.podId);
-  await refreshPollingDataForPod(result.podId);
+  await refreshPodStateForPod(result.podId);
 
   return c.json(
     createSuccessResponse(buildSessionResponse(result, new Date(), responsePod?.location)),
@@ -468,7 +468,7 @@ registerOpenApiRoute(sessionsGroup, deleteSessionRoute, async (c) => {
     .where(eq(podSessions.id, id));
   const podId = getSessionPodId(existingSession);
   if (podId) {
-    await refreshPollingDataForPod(podId);
+    await refreshPodStateForPod(podId);
   }
 
   return c.json(createSuccessResponse({ message: "Session deleted successfully" }), 200);
@@ -491,7 +491,7 @@ registerOpenApiRoute(sessionsGroup, permanentDeleteSessionRoute, async (c) => {
   await db.delete(podSessions).where(eq(podSessions.id, id));
   const podId = getSessionPodId(existingSession);
   if (podId) {
-    await refreshPollingDataForPod(podId);
+    await refreshPodStateForPod(podId);
   }
 
   return c.json(
@@ -526,7 +526,7 @@ registerOpenApiRoute(sessionsGroup, restoreSessionRoute, async (c) => {
     .where(eq(podSessions.id, id));
   const podId = getSessionPodId(existingSession);
   if (podId) {
-    await refreshPollingDataForPod(podId);
+    await refreshPodStateForPod(podId);
   }
 
   return c.json(createSuccessResponse({ message: "Session restored successfully" }), 200);
