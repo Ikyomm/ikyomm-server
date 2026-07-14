@@ -1,5 +1,4 @@
 import { serve } from "@hono/node-server";
-import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHonoRequestLogger } from "@ikyomm/logger";
 import {
   applyAppSecurity,
@@ -9,14 +8,14 @@ import {
 } from "@ikyomm/utils";
 import { openApiInfo } from "@/config/openapi";
 import { env } from "@/config/env";
+import { createOpenApiHono } from "@/lib/openapi-hono";
 import { logger } from "@/lib/logger";
 import { logGatewayProxyRoutes, registerGatewayRoutes } from "@/routes";
 import { registerGatewaySocketProxy } from "@/socket-proxy";
 
-const app = new OpenAPIHono();
+const app = createOpenApiHono();
 applyAppSecurity(app, {
   corsOrigins: env.CORS_ALLOWED_ORIGINS,
-  globalRateLimitSkipPaths: ["/api/ommpods/polling"],
 });
 app.use("*", createHonoRequestLogger(logger));
 registerGatewayRoutes(app);

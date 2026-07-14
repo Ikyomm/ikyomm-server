@@ -1,10 +1,12 @@
-import { createRoute, type OpenAPIHono } from "@hono/zod-openapi";
+/** biome-ignore-all assist/source/organizeImports: forced */
+import { createRoute } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
   createFaviconHandler,
   createHealthCheckHandler,
   resolveClientIpFromHeaderGetter,
 } from "@ikyomm/utils";
+import type { AppOpenAPIHono } from "@/lib/openapi-hono";
 import { logger } from "@/lib/logger";
 import { createUpstreamUrl, proxyRoutes, type ProxyRoute } from "@/proxy";
 
@@ -42,17 +44,6 @@ const HOP_BY_HOP_RESPONSE_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
-const OMMPODS_POLLING_STALE_MAX_AGE_MS = 10_000;
-const OMMPODS_POLLING_CACHE_MAX_ENTRIES = 1_000;
-const OMMPODS_POLLING_FALLBACK_STATUSES = new Set([429, 500, 502, 503, 504]);
-
-type OmmpodsPollingCacheEntry = {
-  body: ArrayBuffer;
-  updatedAt: number;
-};
-
-const ommpodsPollingCache = new Map<string, OmmpodsPollingCacheEntry>();
-
 const gatewayHealthRoute = createRoute({
   method: "get",
   path: "/health",
@@ -243,109 +234,6 @@ function sanitizeResponseHeaders(source: Headers, authPanelScope: string | null)
   return headers;
 }
 
-function isOmmpodsPollingRequest(c: Context, route: ProxyRoute) {
-  if (c.req.method !== "GET" || route.prefix !== "/api/ommpods") {
-    return false;
-  }
-
-  const pathname = new URL(c.req.url).pathname;
-  return /^\/api\/ommpods\/polling\/pods\/[^/]+$/.test(pathname);
-}
-
-function getOmmpodsPollingCacheKey(c: Context) {
-  return new URL(c.req.url).pathname;
-}
-
-function setOmmpodsPollingCache(c: Context, body: ArrayBuffer) {
-  const key = getOmmpodsPollingCacheKey(c);
-
-  if (
-    !ommpodsPollingCache.has(key) &&
-    ommpodsPollingCache.size >= OMMPODS_POLLING_CACHE_MAX_ENTRIES
-  ) {
-    const oldestKey = ommpodsPollingCache.keys().next().value;
-    if (oldestKey) {
-      ommpodsPollingCache.delete(oldestKey);
-    }
-  }
-
-  ommpodsPollingCache.set(key, {
-    body,
-    updatedAt: Date.now(),
-  });
-}
-
-function canCacheOmmpodsPollingResponse(response: Response) {
-  const source = response.headers.get("X-OMMPods-Polling-Source");
-  return source !== "safe-default" && source !== "gateway-safe-default";
-}
-
-function getOmmpodsPollingCachedResponse(c: Context) {
-  const cached = ommpodsPollingCache.get(getOmmpodsPollingCacheKey(c));
-
-  if (!cached || Date.now() - cached.updatedAt > OMMPODS_POLLING_STALE_MAX_AGE_MS) {
-    return null;
-  }
-
-  return new Response(cached.body.slice(0), {
-    status: 200,
-    headers: {
-      "Cache-Control": "no-store, max-age=0",
-      "Content-Type": "application/json",
-      "X-OMMPods-Polling-Source": "gateway-stale",
-    },
-  });
-}
-
-function createOmmpodsPollingFallbackResponse(c: Context, error: unknown) {
-  const podId = new URL(c.req.url).pathname.split("/").at(-1) ?? "unknown";
-  const cachedResponse = getOmmpodsPollingCachedResponse(c);
-
-  if (cachedResponse) {
-    logger.warn("ommpods polling upstream unavailable; serving stale gateway cache", {
-      method: c.req.method,
-      path: new URL(c.req.url).pathname,
-      podId,
-      error,
-    });
-
-    return cachedResponse;
-  }
-
-  logger.warn("ommpods polling upstream unavailable; serving safe fallback", {
-    method: c.req.method,
-    path: new URL(c.req.url).pathname,
-    podId,
-    error,
-  });
-
-  c.header("Cache-Control", "no-store, max-age=0");
-  c.header("X-OMMPods-Polling-Source", "gateway-safe-default");
-
-  return c.json(
-    {
-      success: true,
-      data: {
-        podData: {
-          connectedDeviceConfig: [],
-          aromaDufuser: {
-            defuserMacIds: [],
-            activeDefuserMacId: null,
-            activeDufuserContainerNumber: null,
-          },
-        },
-        r: 255,
-        g: 255,
-        b: 255,
-        sessionStartingDelay: null,
-        sessionEndingDelay: null,
-        session: null,
-      },
-    },
-    200
-  );
-}
-
 function createProxyHandler(route: ProxyRoute) {
   return async (c: Context) => {
     try {
@@ -390,23 +278,6 @@ function createProxyHandler(route: ProxyRoute) {
         c.req.method === "HEAD" || response.status === 204 || response.status === 304
           ? undefined
           : await response.arrayBuffer();
-      const isPollingRequest = isOmmpodsPollingRequest(c, route);
-
-      if (isPollingRequest && OMMPODS_POLLING_FALLBACK_STATUSES.has(response.status)) {
-        return createOmmpodsPollingFallbackResponse(c, {
-          status: response.status,
-          statusText: response.statusText,
-        });
-      }
-
-      if (
-        isPollingRequest &&
-        response.status === 200 &&
-        responseBody &&
-        canCacheOmmpodsPollingResponse(response)
-      ) {
-        setOmmpodsPollingCache(c, responseBody.slice(0));
-      }
 
       return new Response(responseBody, {
         status: response.status,
@@ -414,10 +285,6 @@ function createProxyHandler(route: ProxyRoute) {
         headers: sanitizeResponseHeaders(response.headers, authPanelScope),
       });
     } catch (error) {
-      if (isOmmpodsPollingRequest(c, route)) {
-        return createOmmpodsPollingFallbackResponse(c, error);
-      }
-
       logger.error("upstream request failed", {
         method: c.req.method,
         prefix: route.prefix,
@@ -446,7 +313,7 @@ function getProxyRoute(prefix: string) {
   return route;
 }
 
-export function registerGatewayRoutes(app: OpenAPIHono) {
+export function registerGatewayRoutes(app: AppOpenAPIHono) {
   const faviconHandler = createFaviconHandler();
   const authProxyRoute = getProxyRoute("/api/auth");
 

@@ -1,6 +1,6 @@
 import type { AppBindings } from "@/types/app";
 import { createOpenApiHono } from "@/lib/openapi-hono";
-import { refreshPodStateForPod } from "@/pod-state";
+import { readPodStateFromRedis, refreshPodStateForPod } from "@/pod-state";
 import type { Context } from "hono";
 import { db, musicPlaylists, musics, podMoodPresets, podSessions } from "@ikyomm/database";
 import { createErrorResponse, createSuccessResponse } from "@ikyomm/utils";
@@ -18,7 +18,6 @@ import {
   getSessionStartEndDelaySeconds,
   hydratePodAromaDefusers,
 } from "../shared";
-import { buildPodSocketState } from "../socket/state";
 
 export const tabletGroup = createOpenApiHono<AppBindings>();
 
@@ -163,7 +162,7 @@ async function buildTabletState(podId: string, preferredMoodPresetId?: string | 
   }
 
   const [polling, moods] = await Promise.all([
-    buildPodSocketState(pod.id, { forceRefresh: true }),
+    (await readPodStateFromRedis(pod.id)) ?? (await refreshPodStateForPod(pod.id)),
     listMoodsForPod(pod),
   ]);
   const selectedMoodId = preferredMoodPresetId ?? polling.moodPresetId ?? moods[0]?.id ?? null;
@@ -226,6 +225,7 @@ tabletGroup.post("/pods/:podId/mood", async (c: Context<AppBindings>) => {
     eventType: "MOOD_CHANGED",
     payload: { moodPresetId: moodPreset.id },
   });
+  await refreshPodStateForPod(podId);
 
   return c.json(createSuccessResponse(await buildTabletState(podId, moodPreset.id)), 200);
 });
@@ -274,6 +274,7 @@ tabletGroup.post("/pods/:podId/aroma", async (c: Context<AppBindings>) => {
       activeDufuserContainerNumber: body.data.activeDufuserContainerNumber,
     },
   });
+  await refreshPodStateForPod(podId);
 
   return c.json(createSuccessResponse(await buildTabletState(podId)), 200);
 });
@@ -324,6 +325,7 @@ tabletGroup.post("/pods/:podId/music", async (c: Context<AppBindings>) => {
     eventType: "MUSIC_CHANGED",
     payload,
   });
+  await refreshPodStateForPod(podId);
 
   return c.json(createSuccessResponse(await buildTabletState(podId)), 200);
 });

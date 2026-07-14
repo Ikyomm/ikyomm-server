@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createMqttConnection } from "@ikyomm/mqtt";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
+import { initializeOmmpodsMqttCommandSubscriber } from "./command-subscriber";
 import { initializeOmmpodsPodMqttPublisher } from "./pod-publisher";
 
 const ONLINE_STATUS = "OMMPOD bridge online";
@@ -46,6 +47,7 @@ export function initializeOmmpodsMqtt() {
   });
   connection.start();
   initializeOmmpodsPodMqttPublisher();
+  initializeOmmpodsMqttCommandSubscriber();
 
   logger.info("ommpods mqtt initialized", {
     server: env.MQTT_SERVER,

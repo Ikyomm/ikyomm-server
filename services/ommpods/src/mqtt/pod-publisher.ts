@@ -1,24 +1,35 @@
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
-import { subscribeToPodStateUpdates, type PodState } from "@/pod-state";
+import {
+  hasPodStateTickerLeadership,
+  subscribeToPodStateUpdates,
+  type PodState,
+} from "@/pod-state";
 import { getOmmpodsMqtt } from "./index";
 
 const MQTT_NULL_TEXT = "NULL";
 const MQTT_TOPIC_PREFIX = "ommpod";
 const MQTT_TOPIC_TYPES = ["rgb", "diffuser", "timer"] as const;
+const LEGACY_STATE_TOPIC_TYPE = "state";
 
 type PollingTopicType = (typeof MQTT_TOPIC_TYPES)[number];
 type PollingPayloadMap = Record<PollingTopicType, string>;
+type PodPayloadCacheTopicType = PollingTopicType;
 
 const lastPublishedPayloads = new Map<string, string>();
+const clearedLegacyStateTopics = new Set<string>();
 let isPodPublisherInitialized = false;
 
-function getPayloadCacheKey(podId: string, topicType: PollingTopicType) {
+function getPayloadCacheKey(podId: string, topicType: PodPayloadCacheTopicType) {
   return `${podId}:${topicType}`;
 }
 
 function getPayloadTopic(podId: string, topicType: PollingTopicType) {
   return `${MQTT_TOPIC_PREFIX}/${podId}/${topicType}`;
+}
+
+function getLegacyStateTopic(podId: string) {
+  return `${MQTT_TOPIC_PREFIX}/${podId}/${LEGACY_STATE_TOPIC_TYPE}`;
 }
 
 function safeInt(value: unknown, defaultValue = 0) {
@@ -55,6 +66,10 @@ async function publishPodStateToMqtt(podId: string, data: PodState) {
     return;
   }
 
+  if (!hasPodStateTickerLeadership()) {
+    return;
+  }
+
   const connection = getOmmpodsMqtt();
   if (!connection?.connected) {
     return;
@@ -85,6 +100,19 @@ async function publishPodStateToMqtt(podId: string, data: PodState) {
       });
     })
   );
+
+  if (!clearedLegacyStateTopics.has(podId)) {
+    await connection.publish(getLegacyStateTopic(podId), "", {
+      qos,
+      retain: true,
+    });
+
+    clearedLegacyStateTopics.add(podId);
+    logger.debug("ommpods mqtt legacy state topic cleared", {
+      podId,
+      topic: getLegacyStateTopic(podId),
+    });
+  }
 }
 
 export function initializeOmmpodsPodMqttPublisher() {

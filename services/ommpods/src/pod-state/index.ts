@@ -1,5 +1,8 @@
 export {
   buildSafePodState,
+  closePodStateTicker,
+  hasPodStateTickerLeadership,
+  initializePodStateTicker,
   readPodStateFromRedis,
   refreshPodStateForPod,
   subscribeToPodStateUpdates,
