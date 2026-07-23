@@ -35,7 +35,6 @@ export const fetchOmmpodsAgentUserList = createTableListFetcher<
     country: user.country,
     state: user.state,
     city: user.city,
-    address: user.address,
     company: user.company,
     employeeId: user.employeeId,
     employeeEmail: user.employeeEmail,

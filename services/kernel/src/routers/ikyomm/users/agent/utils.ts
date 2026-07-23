@@ -26,7 +26,6 @@ export async function findOmmpodsAgentUserById(id: string, options?: IncludeDele
       country: user.country,
       state: user.state,
       city: user.city,
-      address: user.address,
       company: user.company,
       employeeId: user.employeeId,
       employeeEmail: user.employeeEmail,

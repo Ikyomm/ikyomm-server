@@ -132,7 +132,6 @@ registerOpenApiRoute(ikyommUsersGroup, create, async (c) => {
         country: body.country,
         state: body.state,
         city: body.city,
-        address: body.address,
         employeeId: body.employeeId,
         employeeEmail: body.employeeEmail,
         createdByUser: currentUser?.id,
