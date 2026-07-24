@@ -34,11 +34,6 @@ app.get(
     includeConnectionInfo: true,
   })
 );
-app.get("/favicon.png", faviconHandler);
-app.get("/favicon.ico", faviconHandler);
-
-const routes = app.route("/", companyRoutes);
-
 app.doc("/doc", openApiInfo);
 const docsHandler = createOpenApiDocsHandler({
   specUrl: "./doc",
@@ -48,6 +43,10 @@ const docsHandler = createOpenApiDocsHandler({
 
 app.get("/", docsHandler);
 app.get("/docs", docsHandler);
+app.get("/favicon.png", faviconHandler);
+app.get("/favicon.ico", faviconHandler);
+
+const routes = app.route("/", companyRoutes);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "company", logger }));
