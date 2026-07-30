@@ -41,6 +41,8 @@ const appSignUpSchema = z.object({
     .object({
       age: z.number().int().min(1).max(130).nullable().optional(),
       gender: z.enum(["male", "female", "dont_disclose"]).nullable().optional(),
+      intents: z.array(z.string().trim().min(1)).nullable().optional(),
+      onboardingCompleted: z.boolean().nullable().optional(),
     })
     .nullable()
     .optional(),

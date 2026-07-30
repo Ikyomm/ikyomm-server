@@ -8,23 +8,16 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { AccessPanel, PlatformMode, OrganizationType } from "./enums";
-import { referenceColumns } from "../reference-columns";
 import { region, zone, zoneLocation } from "../location";
+import { referenceColumns } from "../reference-columns";
+import { AccessPanel, OrganizationType, PlatformMode } from "./enums";
 
 export type UserMetadata = {
   age?: number | null;
   gender?: "male" | "female" | "dont_disclose" | null;
+  intents?: string[] | null;
+  onboardingCompleted?: boolean | null;
 };
-
-export const waitlist = pgTable(
-  "waitlist",
-  {
-    id: text("id").primaryKey(),
-    email: text("email").notNull(),
-  },
-  (table) => [uniqueIndex("waitlist_email_uidx").on(table.email)]
-);
 
 export const user = pgTable(
   "user",

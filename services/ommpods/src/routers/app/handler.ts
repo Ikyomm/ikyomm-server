@@ -1,6 +1,5 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context } from "hono";
 import {
   OmmPodType,
   db,
@@ -11,18 +10,15 @@ import {
   podSessions,
   pods,
   userWallet,
-  waitlist,
   walletTransactions,
 } from "@ikyomm/database";
 import {
   createErrorResponse,
   createRequiredAuthSessionMiddleware,
   createSuccessResponse,
-  generateRandomId,
   getBetterAuthContext,
 } from "@ikyomm/utils";
 import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
-import { z } from "zod";
 import { buildSessionResponse, hydratePodAromaDefusers } from "../shared";
 
 export const appGroup = new OpenAPIHono<AppBindings>();
@@ -36,39 +32,6 @@ const appAuthMiddleware = createRequiredAuthSessionMiddleware({
     hasOrganization: false,
   },
   enableRedisCache: true,
-});
-
-const waitlistSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-});
-
-appGroup.post("/waitlist", async (c: Context<AppBindings>) => {
-  const payload = await c.req.json().catch(() => null);
-  const parsed = waitlistSchema.safeParse(payload);
-
-  if (!parsed.success) {
-    return c.json(
-      createErrorResponse({
-        error: "Bad Request",
-        message: parsed.error.issues[0]?.message ?? "Invalid waitlist payload.",
-      }),
-      400
-    );
-  }
-
-  const { email } = parsed.data;
-
-  await db
-    .insert(waitlist)
-    .values({
-      id: generateRandomId(),
-      email,
-    })
-    .onConflictDoNothing({ target: waitlist.email });
-
-  const [record] = await db.select().from(waitlist).where(eq(waitlist.email, email)).limit(1);
-
-  return c.json(createSuccessResponse(record), 200);
 });
 
 appGroup.use("*", appAuthMiddleware);
