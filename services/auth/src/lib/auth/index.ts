@@ -39,6 +39,7 @@ const {
   betterAuthSecret,
   betterAuthUrl,
   betterAuthAllowedHosts,
+  cookieSameSite,
   crossSubDomainCookies,
   isProduction,
   trustedOrigins,
@@ -414,7 +415,7 @@ async function createAuthInstance() {
     advanced: {
       crossSubDomainCookies,
       defaultCookieAttributes: {
-        sameSite: "lax",
+        sameSite: cookieSameSite,
         secure: isProduction,
         httpOnly: true,
         path: "/",

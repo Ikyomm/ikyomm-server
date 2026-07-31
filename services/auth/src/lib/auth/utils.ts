@@ -31,6 +31,16 @@ function getTrustedOriginHosts(origins: string[]) {
   );
 }
 
+function hasOriginOutsideCookieDomain(origins: string[], domain: string) {
+  return origins.some((origin) => {
+    try {
+      return !matchesCookieDomain(new URL(origin).hostname, domain);
+    } catch {
+      return false;
+    }
+  });
+}
+
 function matchesCookieDomain(host: string, domain: string) {
   return host === domain || host.endsWith(`.${domain}`);
 }
@@ -41,6 +51,7 @@ export function getBetterAuthConfigState() {
   const isProduction = env.NODE_ENV === "production";
   const crossSubDomainCookiesEnabled = isProduction && env.BETTER_AUTH_CROSS_SUBDOMAIN_COOKIES;
   const cookieDomain = env.BETTER_AUTH_COOKIE_DOMAIN;
+  let hasCrossSiteTrustedOrigin = false;
 
   if (crossSubDomainCookiesEnabled && !cookieDomain) {
     throw new Error(
@@ -49,15 +60,16 @@ export function getBetterAuthConfigState() {
   }
 
   if (crossSubDomainCookiesEnabled && cookieDomain) {
-    const incompatibleHosts = getTrustedOriginHosts(trustedOrigins).filter(
-      (host) => !matchesCookieDomain(host, cookieDomain)
-    );
-
-    if (incompatibleHosts.length > 0) {
+    if (!matchesCookieDomain(betterAuthUrl.hostname, cookieDomain)) {
       throw new Error(
-        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must be a shared parent domain for all trusted origins. Incompatible hosts: ${incompatibleHosts.join(", ")}`
+        `BETTER_AUTH_COOKIE_DOMAIN=${cookieDomain} must be a parent domain of the BETTER_AUTH_URL host (${betterAuthUrl.hostname})`
       );
     }
+
+    // Trusted origins are browser clients, not cookie recipients. They do not
+    // need to be children of the cookie domain (for example localhost can call
+    // the production auth API). Such clients do require a cross-site cookie.
+    hasCrossSiteTrustedOrigin = hasOriginOutsideCookieDomain(trustedOrigins, cookieDomain);
   }
 
   return {
@@ -70,6 +82,7 @@ export function getBetterAuthConfigState() {
           domain: cookieDomain,
         }
       : undefined,
+    cookieSameSite: hasCrossSiteTrustedOrigin ? ("none" as const) : ("lax" as const),
     isProduction,
     trustedOrigins,
   };
