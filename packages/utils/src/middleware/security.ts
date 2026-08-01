@@ -1,9 +1,11 @@
 import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
-import { secureHeaders } from "hono/secure-headers";
-import type { Context, Env, Hono } from "hono";
+import type { Context } from "hono";
+import type { Hono } from "hono/quick";
 import { requestId } from "hono/request-id";
+import { secureHeaders } from "hono/secure-headers";
+import type { Env, MiddlewareHandler } from "hono/types";
 import {
   SECURITY_CORS_ALLOW_HEADERS,
   SECURITY_CORS_ALLOW_METHODS,
@@ -112,7 +114,7 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
       ),
   });
 
-  app.use("*", async (c, next) => {
+  const bodyLimitGate: MiddlewareHandler<E> = async (c, next) => {
     const shouldSkipBodyLimit = skipBodyLimitPaths.some((skipPath) =>
       matchesPathPrefix(c.req.path, skipPath)
     );
@@ -123,13 +125,14 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
     }
 
     await bodyLimitMiddleware(c, next);
-  });
+  };
+  app.use("*", bodyLimitGate);
 
   if (!validateJsonBody) {
     return;
   }
 
-  app.use("*", async (c, next) => {
+  const jsonBodyValidator: MiddlewareHandler<E> = async (c, next) => {
     const method = c.req.method;
     if (!["POST", "PUT", "PATCH"].includes(method)) {
       await next();
@@ -159,5 +162,6 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
         400
       );
     }
-  });
+  };
+  app.use("*", jsonBodyValidator);
 }

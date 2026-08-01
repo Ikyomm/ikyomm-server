@@ -1,5 +1,6 @@
 import { UnstorageStore, rateLimiter } from "hono-rate-limiter";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context } from "hono";
+import type { MiddlewareHandler } from "hono/types";
 import { resolveClientIpFromHeaderGetter } from "../functions/network";
 import { getRatelimiterRedisStorage } from "../redis";
 

@@ -1,5 +1,5 @@
 import type { DatabaseResource } from "@ikyomm/database";
-import type { MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono/types";
 import {
   createRequiredAuthSessionMiddleware,
   getBetterAuthContext,

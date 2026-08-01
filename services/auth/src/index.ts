@@ -11,8 +11,8 @@ import {
 import { createHonoRequestLogger } from "@ikyomm/logger";
 import {
   applyAppSecurity,
-  createErrorResponse,
   createErrorHandler,
+  createErrorResponse,
   createFaviconHandler,
   createHealthCheckHandler,
   createNotFoundHandler,
@@ -22,8 +22,9 @@ import {
   PasswordUtils,
 } from "@ikyomm/utils";
 import { and, eq, gte, sql } from "drizzle-orm";
-import { Hono } from "hono";
+import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { Hono } from "hono/quick";
 import { z } from "zod";
 import { env } from "@/config/env";
 import { startAuthCrons } from "@/crons";
@@ -31,7 +32,7 @@ import { initializeAuthSecondaryStorage } from "@/lib/auth/utils";
 import { logger } from "@/lib/logger";
 
 const app = new Hono();
-const APP_SIGNUP_INITIAL_CREDIT_MINUTE = 500;
+const APP_SIGNUP_INITIAL_CREDIT_MINUTE = 1000;
 
 const appSignUpSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -102,7 +103,7 @@ app.use("*", createHonoRequestLogger(logger));
 const faviconHandler = createFaviconHandler();
 app.get("/health", createHealthCheckHandler({ serviceName: "auth" }));
 app.get("/api/auth/health", createHealthCheckHandler({ serviceName: "auth" }));
-app.get("/api/auth/check-email-panel", async (c) => {
+app.get("/api/auth/check-email-panel", async (c: Context) => {
   const email = c.req.query("email")?.trim().toLowerCase();
 
   if (!email) {
@@ -152,7 +153,7 @@ app.get("/api/auth/check-email-panel", async (c) => {
     200
   );
 });
-app.post("/api/auth/app/sign-up", async (c) => {
+app.post("/api/auth/app/sign-up", async (c: Context) => {
   const payload = await c.req.json().catch(() => null);
   const parsed = appSignUpSchema.safeParse(payload);
 
@@ -339,8 +340,8 @@ app.post("/api/auth/app/sign-up", async (c) => {
 });
 app.get("/favicon.png", faviconHandler);
 app.get("/favicon.ico", faviconHandler);
-app.get("/docs", (c) => c.redirect("/api/auth/docs", 302));
-app.get("/", (c) => c.redirect("/docs", 302));
+app.get("/docs", (c: Context) => c.redirect("/api/auth/docs", 302));
+app.get("/", (c: Context) => c.redirect("/docs", 302));
 
 await initDB({ logger, serviceName: "auth" });
 startAuthCrons({ logger });
@@ -356,7 +357,7 @@ const authWarmupPromise = (async () => {
   });
 });
 
-app.all("*", async (c) => {
+app.all("*", async (c: Context) => {
   const { getAuth } = await authModulePromise;
   const auth = await getAuth();
   return auth.handler(c.req.raw);

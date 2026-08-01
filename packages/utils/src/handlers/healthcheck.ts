@@ -1,5 +1,5 @@
-import type { Context } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import type { Context } from "hono";
 
 export type HealthCheckCheckResult =
   | boolean

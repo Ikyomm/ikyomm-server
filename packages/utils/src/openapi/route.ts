@@ -1,5 +1,6 @@
 import { createRoute, type OpenAPIHono, type RouteConfig } from "@hono/zod-openapi";
-import type { Context, Env, Schema, ValidationTargets } from "hono";
+import type { Context } from "hono";
+import type { Env, Schema, ValidationTargets } from "hono/types";
 import type { ZodType } from "zod";
 import {
   ApiBadRequestOpenApi,

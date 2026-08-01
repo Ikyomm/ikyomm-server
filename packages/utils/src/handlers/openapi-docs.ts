@@ -1,4 +1,5 @@
 import { Scalar } from "@scalar/hono-api-reference";
+import type { Context } from "hono";
 
 type ScalarHandlerOptions = Exclude<Parameters<typeof Scalar>[0], (...args: never[]) => unknown>;
 
@@ -24,7 +25,7 @@ function resolveSpecUrl(specUrl: string, forwardedPrefix: string | undefined) {
 export function createOpenApiDocsHandler(options: OpenApiDocsHandlerOptions) {
   const { specUrl = "./doc", ...scalarOptions } = options;
 
-  return Scalar((c) => {
+  return Scalar((c: Context) => {
     const resolvedSpecUrl = resolveSpecUrl(specUrl, c.req.header("x-forwarded-prefix"));
 
     return {

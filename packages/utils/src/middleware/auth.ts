@@ -10,7 +10,8 @@ import {
 } from "@ikyomm/database";
 import { and, eq, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
-import type { Context, ContextVariableMap, MiddlewareHandler } from "hono";
+import type { Context, ContextVariableMap } from "hono";
+import type { MiddlewareHandler } from "hono/types";
 import { env } from "../env";
 import { AUTH_SESSION_FORWARD_HEADERS } from "../functions/network";
 import { AUTH_MIDDLEWARE_REDIS_NAMESPACE, getRedisClient } from "../redis";
@@ -927,7 +928,7 @@ async function resolveOrganizationContext(options: {
     };
   }
 
-  let db;
+  let db: ReturnType<typeof getDB>;
   try {
     db = getDB();
   } catch {
@@ -1029,7 +1030,7 @@ async function resolveAuthorizationContext(options: {
     };
   }
 
-  let db;
+  let db: ReturnType<typeof getDB>;
   try {
     db = getDB();
   } catch {
