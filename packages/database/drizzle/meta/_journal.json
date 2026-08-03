@@ -330,6 +330,20 @@
       "when": 1785431840319,
       "tag": "0046_colorful_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1785771916928,
+      "tag": "0047_little_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785786067000,
+      "tag": "0048_split_legacy_product_collections",
+      "breakpoints": true
     }
   ]
 }

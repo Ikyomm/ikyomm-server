@@ -7,6 +7,7 @@ import {
   index,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   uniqueIndex,
@@ -14,6 +15,7 @@ import {
 import { user } from "../../auth/schema";
 import { referenceColumns } from "../../reference-columns";
 import { brands } from "../brands/schema";
+import { CategoryStatus } from "../categories/enums";
 import { categories, subcategories } from "../categories/schema";
 import { ProductStatus, ProductType, StockStatus, VariantStatus } from "./enums";
 
@@ -25,6 +27,23 @@ export type ProductImage = {
   sortOrder?: number;
 };
 export type ProductVariantAttributes = Record<string, string>;
+
+export const productCollections = pgTable(
+  "treasure_product_collections",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    status: CategoryStatus("status").default("ACTIVE").notNull(),
+    ...referenceColumns((): AnyPgColumn => user.id),
+  },
+  (table) => [
+    uniqueIndex("treasure_product_collections_name_uidx").on(table.name),
+    uniqueIndex("treasure_product_collections_slug_uidx").on(table.slug),
+    index("treasure_product_collections_status_idx").on(table.status),
+  ]
+);
 
 export const products = pgTable(
   "treasure_products",
@@ -69,6 +88,27 @@ export const products = pgTable(
       foreignColumns: [subcategories.categoryId, subcategories.id],
       name: "treasure_products_category_subcategory_fk",
     }).onDelete("restrict"),
+  ]
+);
+
+export const productCollectionProducts = pgTable(
+  "treasure_product_collection_products",
+  {
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => productCollections.id, { onDelete: "cascade" }),
+    ...referenceColumns((): AnyPgColumn => user.id),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.productId, table.collectionId],
+      name: "treasure_product_collection_products_pk",
+    }),
+    index("treasure_product_collection_products_product_id_idx").on(table.productId),
+    index("treasure_product_collection_products_collection_id_idx").on(table.collectionId),
   ]
 );
 

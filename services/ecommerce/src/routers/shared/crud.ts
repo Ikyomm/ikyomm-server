@@ -30,6 +30,19 @@ export type CrudBeforeCreate = (input: {
   userId: string;
 }) => Promise<string | null>;
 
+type CrudBodyTransform = (input: {
+  body: Record<string, unknown>;
+  id?: string;
+  userId: string;
+}) => Promise<Record<string, unknown>> | Record<string, unknown>;
+
+type CrudAfterWrite = (input: {
+  body: Record<string, unknown>;
+  id: string;
+  item: Record<string, unknown>;
+  userId: string;
+}) => Promise<void> | void;
+
 export interface CrudResourceConfig {
   name: string;
   path: string;
@@ -49,6 +62,10 @@ export interface CrudResourceConfig {
   parentOrderKey?: string;
   beforeCreate?: CrudBeforeCreate;
   beforeUpdate?: CrudBeforeCreate;
+  transformCreateBody?: CrudBodyTransform;
+  transformUpdateBody?: CrudBodyTransform;
+  afterCreate?: CrudAfterWrite;
+  afterUpdate?: CrudAfterWrite;
   listQuerySchema?: z.ZodTypeAny;
   listLoader?: (input: {
     limit: number;
@@ -173,7 +190,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     tags: [resource.tag],
     middleware: [listAuthMiddleware],
     summary: `List ${resource.name}`,
-    request: { query: listQuerySchema },
+    request: { query: listQuerySchema as any },
     responses: {
       200: createApiSuccessResponse(listResponseSchema, `${resource.name} fetched successfully`),
     },
@@ -358,7 +375,8 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
       if (!ownedOrder) return forbidden(c);
     }
 
-    const validationMessage = await resource.beforeCreate?.({ body, userId });
+    const id = generateRandomId();
+    const validationMessage = await resource.beforeCreate?.({ body, id, userId });
     if (validationMessage) {
       return c.json(
         createErrorResponse({ error: "Unprocessable Entity", message: validationMessage }),
@@ -367,14 +385,22 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     }
 
     const values: Record<string, unknown> = {
-      ...body,
-      id: generateRandomId(),
+      ...(resource.transformCreateBody
+        ? await resource.transformCreateBody({ body, id, userId })
+        : body),
+      id,
       createdByUser: userId,
     };
     if (resource.ownerKey) values[resource.ownerKey] = userId;
 
     const insertedRows = await db.insert(resource.table).values(values).returning();
     const insertedItem = (insertedRows as any[])[0];
+    await resource.afterCreate?.({
+      body,
+      id: String(insertedItem.id),
+      item: insertedItem,
+      userId,
+    });
     const item = resource.hydrateRecord
       ? await resource.hydrateRecord(String(insertedItem.id))
       : insertedItem;
@@ -400,7 +426,12 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
 
     const updatedItem = await db
       .update(resource.table)
-      .set({ ...body, updatedByUser: userId })
+      .set({
+        ...(resource.transformUpdateBody
+          ? await resource.transformUpdateBody({ body, id, userId })
+          : body),
+        updatedByUser: userId,
+      })
       .where(scopedWhere(resource, id, userId))
       .returning()
       .then((rows) => rows[0]);
@@ -410,6 +441,12 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
         404
       );
     }
+    await resource.afterUpdate?.({
+      body,
+      id: String(updatedItem.id),
+      item: updatedItem,
+      userId,
+    });
     const item = resource.hydrateRecord
       ? await resource.hydrateRecord(String(updatedItem.id))
       : updatedItem;

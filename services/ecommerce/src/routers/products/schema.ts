@@ -1,4 +1,11 @@
-import { brands, categories, products, productVariants, subcategories } from "@ikyomm/database";
+import {
+  brands,
+  categories,
+  productCollections,
+  products,
+  productVariants,
+  subcategories,
+} from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createDbInsertSchema, createDbSelectSchema, createDbUpdateSchema } from "@ikyomm/utils";
 
@@ -16,6 +23,7 @@ const omit = [
 export const brandSelectSchema = createDbSelectSchema(brands);
 export const categorySelectSchema = createDbSelectSchema(categories);
 export const subcategorySelectSchema = createDbSelectSchema(subcategories);
+export const productCollectionSelectSchema = createDbSelectSchema(productCollections);
 
 export const productSchemas = {
   selectSchema: createDbSelectSchema(products),
@@ -27,6 +35,11 @@ export const productVariantSchemas = {
   insertSchema: createDbInsertSchema(productVariants, { omit }),
   updateSchema: createDbUpdateSchema(productVariants, { omit }),
 };
+export const productCollectionSchemas = {
+  selectSchema: productCollectionSelectSchema,
+  insertSchema: createDbInsertSchema(productCollections, { omit }),
+  updateSchema: createDbUpdateSchema(productCollections, { omit }),
+};
 export const productVariantSkuAvailabilityQuerySchema = z.object({
   sku: z.string().trim().min(4).max(100),
   excludeId: z.string().trim().min(1).optional(),
@@ -35,7 +48,25 @@ export const productVariantSkuAvailabilitySchema = z.object({
   sku: z.string(),
   available: z.boolean(),
 });
-export const productWithImagesSchema = productSchemas.selectSchema;
+const productCollectionSummarySchema = productCollectionSelectSchema.pick({
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  status: true,
+});
+
+export const productWithImagesSchema = productSchemas.selectSchema.extend({
+  collectionIds: z.array(z.string()),
+  collections: z.array(productCollectionSummarySchema),
+});
+
+const productCollectionIdsSchema = {
+  collectionIds: z.array(z.string().trim().min(1)).optional(),
+};
+
+export const productCreateSchema = productSchemas.insertSchema.extend(productCollectionIdsSchema);
+export const productUpdateSchema = productSchemas.updateSchema.extend(productCollectionIdsSchema);
 
 const optionalBooleanQuerySchema = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
@@ -73,6 +104,7 @@ export const productFilterOptionsSchema = z.object({
   ),
   productTypes: z.array(z.enum(["SIMPLE", "VARIABLE", "BUNDLE", "SUBSCRIPTION"])),
   statuses: z.array(z.enum(["PLANNED", "DRAFT", "ACTIVE", "INACTIVE", "OUT_OF_STOCK"])),
+  collections: z.array(productCollectionSummarySchema),
 });
 
 export const productDetailsSchema = productWithImagesSchema.extend({

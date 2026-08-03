@@ -24,6 +24,7 @@ export const DATABASE_RESOURCES = {
   treasure_order_items: "treasure_order_items",
   treasure_orders: "treasure_orders",
   treasure_payments: "treasure_payments",
+  treasure_product_collections: "treasure_product_collections",
   treasure_product_variants: "treasure_product_variants",
   treasure_products: "treasure_products",
   treasure_reviews: "treasure_reviews",

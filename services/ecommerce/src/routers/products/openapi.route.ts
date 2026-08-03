@@ -1,4 +1,10 @@
-import { products, productVariants } from "@ikyomm/database";
+import {
+  db,
+  productCollectionProducts,
+  productCollections,
+  products,
+  productVariants,
+} from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createApiSuccessResponse, createOpenApiRoute } from "@ikyomm/utils";
 import type { CrudResourceConfig } from "../shared/crud";
@@ -7,7 +13,10 @@ import {
   productDetailsSchema,
   productFilterOptionsSchema,
   productListQuerySchema,
+  productCollectionSchemas,
+  productCreateSchema,
   productSchemas,
+  productUpdateSchema,
   productVariantSkuAvailabilityQuerySchema,
   productVariantSkuAvailabilitySchema,
   productVariantSchemas,
@@ -15,6 +24,66 @@ import {
 } from "./schema";
 import { fetchProducts, findProduct } from "./list";
 import { validateProductVariantSku } from "./sku";
+import { and, eq, inArray } from "drizzle-orm";
+
+function getCollectionIds(body: Record<string, unknown>) {
+  if (!Array.isArray(body.collectionIds)) {
+    return null;
+  }
+
+  return [...new Set(body.collectionIds.filter((id): id is string => typeof id === "string"))];
+}
+
+function productRowBody(body: Record<string, unknown>) {
+  const { collectionIds: _collectionIds, ...rowBody } = body;
+  return rowBody;
+}
+
+async function validateProductCollections({ body }: { body: Record<string, unknown> }) {
+  const collectionIds = getCollectionIds(body);
+  if (!collectionIds || collectionIds.length === 0) {
+    return null;
+  }
+
+  const rows = await db
+    .select({ id: productCollections.id })
+    .from(productCollections)
+    .where(
+      and(inArray(productCollections.id, collectionIds), eq(productCollections.isDeleted, false))
+    );
+  if (rows.length === collectionIds.length) {
+    return null;
+  }
+
+  return "One or more selected product collections do not exist.";
+}
+
+async function syncProductCollections({
+  body,
+  id,
+  userId,
+}: {
+  body: Record<string, unknown>;
+  id: string;
+  userId: string;
+}) {
+  const collectionIds = getCollectionIds(body);
+  if (!collectionIds) {
+    return;
+  }
+
+  await db.delete(productCollectionProducts).where(eq(productCollectionProducts.productId, id));
+
+  if (collectionIds.length > 0) {
+    await db.insert(productCollectionProducts).values(
+      collectionIds.map((collectionId) => ({
+        productId: id,
+        collectionId,
+        createdByUser: userId,
+      }))
+    );
+  }
+}
 
 export const productVariantSkuAvailabilityRoute = createOpenApiRoute({
   method: "get",
@@ -66,6 +135,8 @@ export const productResources: CrudResourceConfig[] = [
     table: products,
     ...productSchemas,
     selectSchema: productWithImagesSchema,
+    insertSchema: productCreateSchema,
+    updateSchema: productUpdateSchema,
     publicRead: true,
     staffWrite: true,
     permissionResource: "treasure_products",
@@ -73,6 +144,33 @@ export const productResources: CrudResourceConfig[] = [
     listLoader: ({ query }) => fetchProducts(productListQuerySchema.parse(query)),
     detailLoader: ({ id }) => findProduct(id),
     hydrateRecord: findProduct,
+    beforeCreate: validateProductCollections,
+    beforeUpdate: validateProductCollections,
+    transformCreateBody: ({ body }) => productRowBody(body),
+    transformUpdateBody: ({ body }) => productRowBody(body),
+    afterCreate: syncProductCollections,
+    afterUpdate: syncProductCollections,
+  },
+  {
+    name: "product collections",
+    path: "product-collections",
+    tag: "Product Collections",
+    table: productCollections,
+    ...productCollectionSchemas,
+    publicRead: true,
+    staffWrite: true,
+    permissionResource: "treasure_product_collections",
+    searchColumns: [
+      productCollections.name,
+      productCollections.slug,
+      productCollections.description,
+    ],
+    sortColumns: {
+      name: productCollections.name,
+      slug: productCollections.slug,
+      createdAt: productCollections.createdAt,
+      updatedAt: productCollections.updatedAt,
+    },
   },
   {
     name: "product variants",

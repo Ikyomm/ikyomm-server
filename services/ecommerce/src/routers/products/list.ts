@@ -1,11 +1,69 @@
-import { brands, categories, db, products, productVariants, subcategories } from "@ikyomm/database";
-import { and, asc, desc, eq, exists, ilike, or, sql } from "drizzle-orm";
+import {
+  brands,
+  categories,
+  db,
+  productCollectionProducts,
+  productCollections,
+  products,
+  productVariants,
+  subcategories,
+} from "@ikyomm/database";
+import { and, asc, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { productListQuerySchema } from "./schema";
 
 type ProductListQuery = z.output<typeof productListQuerySchema>;
 
-export function fetchProducts(input: ProductListQuery) {
+type ProductRow = typeof products.$inferSelect;
+
+async function withProductCollections<TProduct extends ProductRow>(rows: TProduct[]) {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const productIds = rows.map((row) => row.id);
+  const collectionRows = await db
+    .select({
+      productId: productCollectionProducts.productId,
+      collection: {
+        id: productCollections.id,
+        name: productCollections.name,
+        slug: productCollections.slug,
+        description: productCollections.description,
+        status: productCollections.status,
+      },
+    })
+    .from(productCollectionProducts)
+    .innerJoin(
+      productCollections,
+      eq(productCollectionProducts.collectionId, productCollections.id)
+    )
+    .where(
+      and(
+        inArray(productCollectionProducts.productId, productIds),
+        eq(productCollections.isDeleted, false)
+      )
+    )
+    .orderBy(asc(productCollections.name));
+
+  const collectionsByProductId = new Map<string, (typeof collectionRows)[number]["collection"][]>();
+  for (const row of collectionRows) {
+    const collections = collectionsByProductId.get(row.productId) ?? [];
+    collections.push(row.collection);
+    collectionsByProductId.set(row.productId, collections);
+  }
+
+  return rows.map((row) => {
+    const collections = collectionsByProductId.get(row.id) ?? [];
+    return {
+      ...row,
+      collectionIds: collections.map((collection) => collection.id),
+      collections,
+    };
+  });
+}
+
+export async function fetchProducts(input: ProductListQuery) {
   const conditions = [eq(products.isDeleted, false)];
 
   if (input.search) {
@@ -52,50 +110,66 @@ export function fetchProducts(input: ProductListQuery) {
     );
   }
 
-  return db.query.products.findMany({
+  const rows = await db.query.products.findMany({
     where: and(...conditions),
     orderBy: [desc(products.createdAt)],
     limit: input.limit,
     offset: input.offset,
   });
+  return withProductCollections(rows);
 }
 
-export function findProduct(id: string) {
-  return db.query.products.findFirst({
+export async function findProduct(id: string) {
+  const row = await db.query.products.findFirst({
     where: and(eq(products.id, id), eq(products.isDeleted, false)),
   });
+  return row ? (await withProductCollections([row]))[0] : null;
 }
 
 export async function fetchProductFilterOptions() {
-  const [brandRows, categoryRows, subcategoryRows, attributeRows] = await Promise.all([
-    db
-      .select({ id: brands.id, name: brands.name, slug: brands.slug })
-      .from(brands)
-      .where(and(eq(brands.isDeleted, false), eq(brands.status, "ACTIVE")))
-      .orderBy(asc(brands.name)),
-    db
-      .select({ id: categories.id, name: categories.name, slug: categories.slug })
-      .from(categories)
-      .where(and(eq(categories.isDeleted, false), eq(categories.status, "ACTIVE")))
-      .orderBy(asc(categories.name)),
-    db
-      .select({
-        id: subcategories.id,
-        categoryId: subcategories.categoryId,
-        name: subcategories.name,
-        slug: subcategories.slug,
-      })
-      .from(subcategories)
-      .where(and(eq(subcategories.isDeleted, false), eq(subcategories.status, "ACTIVE")))
-      .orderBy(asc(subcategories.name)),
-    db.execute<{ name: string; value: string }>(sql`
+  const [brandRows, categoryRows, subcategoryRows, collectionRows, attributeRows] =
+    await Promise.all([
+      db
+        .select({ id: brands.id, name: brands.name, slug: brands.slug })
+        .from(brands)
+        .where(and(eq(brands.isDeleted, false), eq(brands.status, "ACTIVE")))
+        .orderBy(asc(brands.name)),
+      db
+        .select({ id: categories.id, name: categories.name, slug: categories.slug })
+        .from(categories)
+        .where(and(eq(categories.isDeleted, false), eq(categories.status, "ACTIVE")))
+        .orderBy(asc(categories.name)),
+      db
+        .select({
+          id: subcategories.id,
+          categoryId: subcategories.categoryId,
+          name: subcategories.name,
+          slug: subcategories.slug,
+        })
+        .from(subcategories)
+        .where(and(eq(subcategories.isDeleted, false), eq(subcategories.status, "ACTIVE")))
+        .orderBy(asc(subcategories.name)),
+      db
+        .select({
+          id: productCollections.id,
+          name: productCollections.name,
+          slug: productCollections.slug,
+          description: productCollections.description,
+          status: productCollections.status,
+        })
+        .from(productCollections)
+        .where(
+          and(eq(productCollections.isDeleted, false), eq(productCollections.status, "ACTIVE"))
+        )
+        .orderBy(asc(productCollections.name)),
+      db.execute<{ name: string; value: string }>(sql`
       select distinct attribute.key as name, attribute.value
       from ${productVariants}
       cross join lateral jsonb_each_text(${productVariants.attributes}) as attribute
       where ${productVariants.isDeleted} = false
       order by attribute.key, attribute.value
     `),
-  ]);
+    ]);
 
   const attributeMap = new Map<string, string[]>();
   for (const attribute of attributeRows.rows) {
@@ -115,5 +189,6 @@ export async function fetchProductFilterOptions() {
     attributes: [...attributeMap].map(([name, values]) => ({ name, values })),
     productTypes: ["SIMPLE", "VARIABLE", "BUNDLE", "SUBSCRIPTION"] as const,
     statuses: ["PLANNED", "DRAFT", "ACTIVE", "INACTIVE", "OUT_OF_STOCK"] as const,
+    collections: collectionRows,
   };
 }
