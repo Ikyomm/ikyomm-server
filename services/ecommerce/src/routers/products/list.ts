@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: forced */
 import {
   brands,
   categories,
