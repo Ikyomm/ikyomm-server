@@ -8,6 +8,7 @@ import {
 } from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createDbInsertSchema, createDbSelectSchema, createDbUpdateSchema } from "@ikyomm/utils";
+import { ecommerceListQuerySchema } from "../shared/schema";
 
 const omit = [
   "id",
@@ -72,9 +73,7 @@ const optionalBooleanQuerySchema = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
   .optional();
 
-export const productListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(25),
-  offset: z.coerce.number().int().min(0).default(0),
+export const productListQuerySchema = ecommerceListQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   brandId: z.string().trim().min(1).optional(),
   categoryId: z.string().trim().min(1).optional(),

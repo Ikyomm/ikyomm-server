@@ -22,7 +22,7 @@ import {
   productVariantSchemas,
   productWithImagesSchema,
 } from "./schema";
-import { fetchProducts, findProduct } from "./list";
+import { countProducts, fetchProducts, findProduct } from "./list";
 import { validateProductVariantSku } from "./sku";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -142,6 +142,7 @@ export const productResources: CrudResourceConfig[] = [
     permissionResource: "treasure_products",
     listQuerySchema: productListQuerySchema,
     listLoader: ({ query }) => fetchProducts(productListQuerySchema.parse(query)),
+    listCountLoader: ({ query }) => countProducts(productListQuerySchema.parse(query)),
     detailLoader: ({ id }) => findProduct(id),
     hydrateRecord: findProduct,
     beforeCreate: validateProductCollections,

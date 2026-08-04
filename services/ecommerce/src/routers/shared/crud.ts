@@ -73,6 +73,10 @@ export interface CrudResourceConfig {
     userId: string | null;
     query: Record<string, unknown>;
   }) => Promise<unknown[]>;
+  listCountLoader?: (input: {
+    userId: string | null;
+    query: Record<string, unknown>;
+  }) => Promise<number>;
   detailLoader?: (input: { id: string; userId: string | null }) => Promise<unknown | null>;
   hydrateRecord?: (id: string) => Promise<unknown | null>;
 }
@@ -320,7 +324,7 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
         })
       : await statement;
     const totalItems = resource.listLoader
-      ? items.length
+      ? ((await resource.listCountLoader?.({ userId, query })) ?? items.length)
       : await db
           .select({ value: count() })
           .from(resource.table)

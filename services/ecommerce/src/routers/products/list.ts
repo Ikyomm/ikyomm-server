@@ -8,13 +8,78 @@ import {
   productVariants,
   subcategories,
 } from "@ikyomm/database";
-import { and, asc, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { productListQuerySchema } from "./schema";
 
 type ProductListQuery = z.output<typeof productListQuerySchema>;
 
 type ProductRow = typeof products.$inferSelect;
+
+function productConditions(input: ProductListQuery) {
+  const conditions = [eq(products.isDeleted, input.isDeleted === true)];
+
+  if (input.search) {
+    conditions.push(
+      or(ilike(products.name, `%${input.search}%`), ilike(products.slug, `%${input.search}%`))!
+    );
+  }
+  if (input.brandId) conditions.push(eq(products.brandId, input.brandId));
+  if (input.categoryId) conditions.push(eq(products.categoryId, input.categoryId));
+  if (input.subcategoryId) conditions.push(eq(products.subcategoryId, input.subcategoryId));
+  if (input.productType) conditions.push(eq(products.productType, input.productType));
+  if (input.status) conditions.push(eq(products.status, input.status));
+  if (input.isSubscriptionEligible !== undefined) {
+    conditions.push(eq(products.isSubscriptionEligible, input.isSubscriptionEligible));
+  }
+  if (input.isHeroProduct !== undefined) {
+    conditions.push(eq(products.isHeroProduct, input.isHeroProduct));
+  }
+  if (input.attributeName || input.attributeValue) {
+    const attributeCondition =
+      input.attributeName && input.attributeValue
+        ? sql`${productVariants.attributes} ->> ${input.attributeName} = ${input.attributeValue}`
+        : input.attributeName
+          ? sql`${productVariants.attributes} ? ${input.attributeName}`
+          : sql`exists (
+              select 1
+              from jsonb_each_text(${productVariants.attributes}) as attribute
+              where attribute.value = ${input.attributeValue}
+            )`;
+
+    conditions.push(
+      exists(
+        db
+          .select({ id: productVariants.id })
+          .from(productVariants)
+          .where(
+            and(
+              eq(productVariants.productId, products.id),
+              eq(productVariants.isDeleted, false),
+              attributeCondition
+            )
+          )
+      )
+    );
+  }
+
+  return conditions;
+}
+
+function productOrderBy(input: ProductListQuery) {
+  const sortColumns = {
+    name: products.name,
+    slug: products.slug,
+    createdAt: products.createdAt,
+    updatedAt: products.updatedAt,
+  } as const;
+  const sortColumn =
+    typeof input.sortBy === "string" ? sortColumns[input.sortBy as keyof typeof sortColumns] : null;
+
+  return input.sortOrder === "asc"
+    ? asc(sortColumn ?? products.createdAt)
+    : desc(sortColumn ?? products.createdAt);
+}
 
 async function withProductCollections<TProduct extends ProductRow>(rows: TProduct[]) {
   if (rows.length === 0) {
@@ -64,59 +129,25 @@ async function withProductCollections<TProduct extends ProductRow>(rows: TProduc
 }
 
 export async function fetchProducts(input: ProductListQuery) {
-  const conditions = [eq(products.isDeleted, false)];
-
-  if (input.search) {
-    conditions.push(
-      or(ilike(products.name, `%${input.search}%`), ilike(products.slug, `%${input.search}%`))!
-    );
-  }
-  if (input.brandId) conditions.push(eq(products.brandId, input.brandId));
-  if (input.categoryId) conditions.push(eq(products.categoryId, input.categoryId));
-  if (input.subcategoryId) conditions.push(eq(products.subcategoryId, input.subcategoryId));
-  if (input.productType) conditions.push(eq(products.productType, input.productType));
-  if (input.status) conditions.push(eq(products.status, input.status));
-  if (input.isSubscriptionEligible !== undefined) {
-    conditions.push(eq(products.isSubscriptionEligible, input.isSubscriptionEligible));
-  }
-  if (input.isHeroProduct !== undefined) {
-    conditions.push(eq(products.isHeroProduct, input.isHeroProduct));
-  }
-  if (input.attributeName || input.attributeValue) {
-    const attributeCondition =
-      input.attributeName && input.attributeValue
-        ? sql`${productVariants.attributes} ->> ${input.attributeName} = ${input.attributeValue}`
-        : input.attributeName
-          ? sql`${productVariants.attributes} ? ${input.attributeName}`
-          : sql`exists (
-              select 1
-              from jsonb_each_text(${productVariants.attributes}) as attribute
-              where attribute.value = ${input.attributeValue}
-            )`;
-
-    conditions.push(
-      exists(
-        db
-          .select({ id: productVariants.id })
-          .from(productVariants)
-          .where(
-            and(
-              eq(productVariants.productId, products.id),
-              eq(productVariants.isDeleted, false),
-              attributeCondition
-            )
-          )
-      )
-    );
-  }
+  const conditions = productConditions(input);
 
   const rows = await db.query.products.findMany({
     where: and(...conditions),
-    orderBy: [desc(products.createdAt)],
+    orderBy: [productOrderBy(input)],
     limit: input.limit,
     offset: input.offset,
   });
   return withProductCollections(rows);
+}
+
+export async function countProducts(input: ProductListQuery) {
+  const conditions = productConditions(input);
+
+  return db
+    .select({ value: count() })
+    .from(products)
+    .where(and(...conditions))
+    .then((rows) => rows[0]?.value ?? 0);
 }
 
 export async function findProduct(id: string) {
