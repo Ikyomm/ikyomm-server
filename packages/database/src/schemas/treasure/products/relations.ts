@@ -5,10 +5,10 @@ import { inventory } from "../inventory/schema";
 import { orderItems } from "../orders/schema";
 import { reviews } from "../reviews/schema";
 import { subscriptions } from "../subscriptions/schema";
-import { productCollectionProducts, productCollections, products, productVariants } from "./schema";
+import { productCollections, products, productVariants } from "./schema";
 
 export const productCollectionRelations = relations(productCollections, ({ many }) => ({
-  productLinks: many(productCollectionProducts),
+  products: many(products),
 }));
 
 export const productRelations = relations(products, ({ many, one }) => ({
@@ -24,24 +24,13 @@ export const productRelations = relations(products, ({ many, one }) => ({
     fields: [products.subcategoryId],
     references: [subcategories.id],
   }),
+  collection: one(productCollections, {
+    fields: [products.collectionId],
+    references: [productCollections.id],
+  }),
   variants: many(productVariants),
-  collectionLinks: many(productCollectionProducts),
   reviews: many(reviews),
 }));
-
-export const productCollectionProductRelations = relations(
-  productCollectionProducts,
-  ({ one }) => ({
-    product: one(products, {
-      fields: [productCollectionProducts.productId],
-      references: [products.id],
-    }),
-    collection: one(productCollections, {
-      fields: [productCollectionProducts.collectionId],
-      references: [productCollections.id],
-    }),
-  })
-);
 
 export const productVariantRelations = relations(productVariants, ({ many, one }) => ({
   product: one(products, {

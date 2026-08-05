@@ -58,23 +58,30 @@ const productCollectionSummarySchema = productCollectionSelectSchema.pick({
 });
 
 export const productWithImagesSchema = productSchemas.selectSchema.extend({
-  collectionIds: z.array(z.string()),
+  collectionId: z.string().nullish(),
   collections: z.array(productCollectionSummarySchema),
 });
 
-const productCollectionIdsSchema = {
-  // Many-to-many product collections replace the legacy `collection` text column.
-  collectionIds: z.array(z.string().trim().min(1)).optional(),
-};
+/** Optional single collection — empty / null means no collection. */
+const productCollectionIdField = z.preprocess((value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return value;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}, z.string().min(1).nullable().optional());
 
-// Legacy `collection` text is optional; memberships are written via `collectionIds`.
 export const productCreateSchema = productSchemas.insertSchema.extend({
-  ...productCollectionIdsSchema,
-  collection: z.string().trim().min(1).nullish(),
+  collectionId: productCollectionIdField,
 });
 export const productUpdateSchema = productSchemas.updateSchema.extend({
-  ...productCollectionIdsSchema,
-  collection: z.string().trim().min(1).nullish(),
+  collectionId: productCollectionIdField,
 });
 
 const optionalBooleanQuerySchema = z
@@ -86,6 +93,7 @@ export const productListQuerySchema = ecommerceListQuerySchema.extend({
   brandId: z.string().trim().min(1).optional(),
   categoryId: z.string().trim().min(1).optional(),
   subcategoryId: z.string().trim().min(1).optional(),
+  collectionId: z.string().trim().min(1).optional(),
   productType: z.enum(["SIMPLE", "VARIABLE", "BUNDLE", "SUBSCRIPTION"]).optional(),
   status: z.enum(["PLANNED", "DRAFT", "ACTIVE", "INACTIVE", "OUT_OF_STOCK"]).optional(),
   isSubscriptionEligible: optionalBooleanQuerySchema,

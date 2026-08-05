@@ -344,6 +344,13 @@
       "when": 1785786067000,
       "tag": "0048_split_legacy_product_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1785900000000,
+      "tag": "0049_product_single_collection",
+      "breakpoints": true
     }
   ]
 }

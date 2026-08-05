@@ -39,6 +39,16 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
       name: "Records / Mood Presets",
       description: "CRUD endpoints for Pod mood preset configuration records.",
     },
+    {
+      name: "Records / Music Playlists",
+      description:
+        "CRUD endpoints for music playlist master records used by mood presets and the website.",
+    },
+    {
+      name: "Records / Musics",
+      description:
+        "CRUD endpoints for music track master records belonging to playlists, for website and device playback.",
+    },
   ],
   "x-tagGroups": [
     {
@@ -51,7 +61,13 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     },
     {
       name: "Records APIs",
-      tags: ["Records / Pods", "Records / Aroma Defusers", "Records / Mood Presets"],
+      tags: [
+        "Records / Pods",
+        "Records / Aroma Defusers",
+        "Records / Mood Presets",
+        "Records / Music Playlists",
+        "Records / Musics",
+      ],
     },
   ],
   servers: [

@@ -1,10 +1,4 @@
-import {
-  db,
-  productCollectionProducts,
-  productCollections,
-  products,
-  productVariants,
-} from "@ikyomm/database";
+import { db, productCollections, products, productVariants } from "@ikyomm/database";
 import { z } from "@hono/zod-openapi";
 import { createApiSuccessResponse, createOpenApiRoute } from "@ikyomm/utils";
 import type { CrudResourceConfig } from "../shared/crud";
@@ -24,67 +18,51 @@ import {
 } from "./schema";
 import { countProducts, fetchProducts, findProduct } from "./list";
 import { validateProductVariantSku } from "./sku";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-function getCollectionIds(body: Record<string, unknown>) {
-  if (!Array.isArray(body.collectionIds)) {
+function getCollectionId(body: Record<string, unknown>): string | null | undefined {
+  if (!("collectionId" in body)) {
+    return undefined;
+  }
+  const value = body.collectionId;
+  if (value === null || value === "") {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function validateProductCollection({ body }: { body: Record<string, unknown> }) {
+  const collectionId = getCollectionId(body);
+  if (collectionId === undefined || collectionId === null) {
     return null;
   }
 
-  return [...new Set(body.collectionIds.filter((id): id is string => typeof id === "string"))];
+  const row = await db
+    .select({ id: productCollections.id })
+    .from(productCollections)
+    .where(and(eq(productCollections.id, collectionId), eq(productCollections.isDeleted, false)))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (row) {
+    return null;
+  }
+
+  return "Selected product collection does not exist.";
 }
 
 function productRowBody(body: Record<string, unknown>) {
-  // Strip M2M + legacy collection fields; links are synced in afterCreate/afterUpdate.
-  // Keep writing `collection: null` so the legacy column stays unused after the M2M migration.
-  const { collectionIds: _collectionIds, collection: _legacyCollection, ...rowBody } = body;
-  return { ...rowBody, collection: null };
-}
-
-async function validateProductCollections({ body }: { body: Record<string, unknown> }) {
-  const collectionIds = getCollectionIds(body);
-  if (!collectionIds || collectionIds.length === 0) {
-    return null;
+  const collectionId = getCollectionId(body);
+  const { collectionIds: _legacyIds, collection: _legacyText, ...rowBody } = body;
+  if (collectionId === undefined) {
+    const { collectionId: _omit, ...rest } = rowBody;
+    return rest;
   }
-
-  const rows = await db
-    .select({ id: productCollections.id })
-    .from(productCollections)
-    .where(
-      and(inArray(productCollections.id, collectionIds), eq(productCollections.isDeleted, false))
-    );
-  if (rows.length === collectionIds.length) {
-    return null;
-  }
-
-  return "One or more selected product collections do not exist.";
-}
-
-async function syncProductCollections({
-  body,
-  id,
-  userId,
-}: {
-  body: Record<string, unknown>;
-  id: string;
-  userId: string;
-}) {
-  const collectionIds = getCollectionIds(body);
-  if (!collectionIds) {
-    return;
-  }
-
-  await db.delete(productCollectionProducts).where(eq(productCollectionProducts.productId, id));
-
-  if (collectionIds.length > 0) {
-    await db.insert(productCollectionProducts).values(
-      collectionIds.map((collectionId) => ({
-        productId: id,
-        collectionId,
-        createdByUser: userId,
-      }))
-    );
-  }
+  return { ...rowBody, collectionId };
 }
 
 export const productVariantSkuAvailabilityRoute = createOpenApiRoute({
@@ -147,12 +125,17 @@ export const productResources: CrudResourceConfig[] = [
     listCountLoader: ({ query }) => countProducts(productListQuerySchema.parse(query)),
     detailLoader: ({ id }) => findProduct(id),
     hydrateRecord: findProduct,
-    beforeCreate: validateProductCollections,
-    beforeUpdate: validateProductCollections,
-    transformCreateBody: ({ body }) => productRowBody(body),
+    beforeCreate: validateProductCollection,
+    beforeUpdate: validateProductCollection,
+    transformCreateBody: ({ body }) => {
+      const row = productRowBody(body);
+      // Create defaults missing collectionId to null.
+      if (!("collectionId" in row)) {
+        return { ...row, collectionId: null };
+      }
+      return row;
+    },
     transformUpdateBody: ({ body }) => productRowBody(body),
-    afterCreate: syncProductCollections,
-    afterUpdate: syncProductCollections,
   },
   {
     name: "product collections",

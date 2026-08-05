@@ -23,6 +23,7 @@ import {
   ecommercePermanentDeleteResultSchema,
   ecommerceRestoreResultSchema,
 } from "./schema";
+import { resolveEcommerceDbError } from "./db-errors";
 
 export type CrudBeforeCreate = (input: {
   body: Record<string, unknown>;
@@ -397,18 +398,32 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
     };
     if (resource.ownerKey) values[resource.ownerKey] = userId;
 
-    const insertedRows = await db.insert(resource.table).values(values).returning();
-    const insertedItem = (insertedRows as any[])[0];
-    await resource.afterCreate?.({
-      body,
-      id: String(insertedItem.id),
-      item: insertedItem,
-      userId,
-    });
-    const item = resource.hydrateRecord
-      ? await resource.hydrateRecord(String(insertedItem.id))
-      : insertedItem;
-    return c.json(createSuccessResponse(item), 201);
+    try {
+      const insertedRows = await db.insert(resource.table).values(values).returning();
+      const insertedItem = (insertedRows as any[])[0];
+      await resource.afterCreate?.({
+        body,
+        id: String(insertedItem.id),
+        item: insertedItem,
+        userId,
+      });
+      const item = resource.hydrateRecord
+        ? await resource.hydrateRecord(String(insertedItem.id))
+        : insertedItem;
+      return c.json(createSuccessResponse(item), 201);
+    } catch (error) {
+      const mapped = resolveEcommerceDbError(error);
+      if (mapped) {
+        return c.json(
+          createErrorResponse({
+            error: mapped.status === 409 ? "Conflict" : "Unprocessable Entity",
+            message: mapped.message,
+          }),
+          mapped.status
+        );
+      }
+      throw error;
+    }
   });
 
   registerOpenApiRoute(app, updateRoute, async (c: any) => {
@@ -428,33 +443,47 @@ export function registerCrudResource(app: OpenAPIHono<AppBindings>, resource: Cr
       );
     }
 
-    const updatedItem = await db
-      .update(resource.table)
-      .set({
-        ...(resource.transformUpdateBody
-          ? await resource.transformUpdateBody({ body, id, userId })
-          : body),
-        updatedByUser: userId,
-      })
-      .where(scopedWhere(resource, id, userId))
-      .returning()
-      .then((rows) => rows[0]);
-    if (!updatedItem) {
-      return c.json(
-        createErrorResponse({ error: "Not Found", message: `${resource.name} not found.` }),
-        404
-      );
+    try {
+      const updatedItem = await db
+        .update(resource.table)
+        .set({
+          ...(resource.transformUpdateBody
+            ? await resource.transformUpdateBody({ body, id, userId })
+            : body),
+          updatedByUser: userId,
+        })
+        .where(scopedWhere(resource, id, userId))
+        .returning()
+        .then((rows) => rows[0]);
+      if (!updatedItem) {
+        return c.json(
+          createErrorResponse({ error: "Not Found", message: `${resource.name} not found.` }),
+          404
+        );
+      }
+      await resource.afterUpdate?.({
+        body,
+        id: String(updatedItem.id),
+        item: updatedItem,
+        userId,
+      });
+      const item = resource.hydrateRecord
+        ? await resource.hydrateRecord(String(updatedItem.id))
+        : updatedItem;
+      return c.json(createSuccessResponse(item), 200);
+    } catch (error) {
+      const mapped = resolveEcommerceDbError(error);
+      if (mapped) {
+        return c.json(
+          createErrorResponse({
+            error: mapped.status === 409 ? "Conflict" : "Unprocessable Entity",
+            message: mapped.message,
+          }),
+          mapped.status
+        );
+      }
+      throw error;
     }
-    await resource.afterUpdate?.({
-      body,
-      id: String(updatedItem.id),
-      item: updatedItem,
-      userId,
-    });
-    const item = resource.hydrateRecord
-      ? await resource.hydrateRecord(String(updatedItem.id))
-      : updatedItem;
-    return c.json(createSuccessResponse(item), 200);
   });
 
   registerOpenApiRoute(app, deleteRoute, async (c: any) => {

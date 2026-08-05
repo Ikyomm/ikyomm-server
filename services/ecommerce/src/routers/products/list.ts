@@ -3,7 +3,6 @@ import {
   brands,
   categories,
   db,
-  productCollectionProducts,
   productCollections,
   products,
   productVariants,
@@ -16,6 +15,13 @@ import type { productListQuerySchema } from "./schema";
 type ProductListQuery = z.output<typeof productListQuerySchema>;
 
 type ProductRow = typeof products.$inferSelect;
+type CollectionSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: "ACTIVE" | "INACTIVE";
+};
 
 function productConditions(input: ProductListQuery) {
   const conditions = [eq(products.isDeleted, input.isDeleted === true)];
@@ -28,6 +34,7 @@ function productConditions(input: ProductListQuery) {
   if (input.brandId) conditions.push(eq(products.brandId, input.brandId));
   if (input.categoryId) conditions.push(eq(products.categoryId, input.categoryId));
   if (input.subcategoryId) conditions.push(eq(products.subcategoryId, input.subcategoryId));
+  if (input.collectionId) conditions.push(eq(products.collectionId, input.collectionId));
   if (input.productType) conditions.push(eq(products.productType, input.productType));
   if (input.status) conditions.push(eq(products.status, input.status));
   if (input.isSubscriptionEligible !== undefined) {
@@ -87,44 +94,35 @@ async function withProductCollections<TProduct extends ProductRow>(rows: TProduc
     return [];
   }
 
-  const productIds = rows.map((row) => row.id);
-  const collectionRows = await db
-    .select({
-      productId: productCollectionProducts.productId,
-      collection: {
+  const collectionIds = [
+    ...new Set(rows.map((row) => row.collectionId).filter((id): id is string => Boolean(id))),
+  ];
+  const collectionById = new Map<string, CollectionSummary>();
+
+  if (collectionIds.length > 0) {
+    const collectionRows = await db
+      .select({
         id: productCollections.id,
         name: productCollections.name,
         slug: productCollections.slug,
         description: productCollections.description,
         status: productCollections.status,
-      },
-    })
-    .from(productCollectionProducts)
-    .innerJoin(
-      productCollections,
-      eq(productCollectionProducts.collectionId, productCollections.id)
-    )
-    .where(
-      and(
-        inArray(productCollectionProducts.productId, productIds),
-        eq(productCollections.isDeleted, false)
-      )
-    )
-    .orderBy(asc(productCollections.name));
-
-  const collectionsByProductId = new Map<string, (typeof collectionRows)[number]["collection"][]>();
-  for (const row of collectionRows) {
-    const collections = collectionsByProductId.get(row.productId) ?? [];
-    collections.push(row.collection);
-    collectionsByProductId.set(row.productId, collections);
+      })
+      .from(productCollections)
+      .where(
+        and(inArray(productCollections.id, collectionIds), eq(productCollections.isDeleted, false))
+      );
+    for (const collection of collectionRows) {
+      collectionById.set(collection.id, collection);
+    }
   }
 
   return rows.map((row) => {
-    const collections = collectionsByProductId.get(row.id) ?? [];
+    const collection = row.collectionId ? (collectionById.get(row.collectionId) ?? null) : null;
     return {
       ...row,
-      collectionIds: collections.map((collection) => collection.id),
-      collections,
+      collectionId: row.collectionId ?? null,
+      collections: collection ? [collection] : [],
     };
   });
 }
