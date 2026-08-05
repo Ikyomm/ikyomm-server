@@ -1,5 +1,11 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { db, productCollections, products, productVariants } from "@ikyomm/database";
+import {
+  db,
+  productCollectionProducts,
+  productCollections,
+  products,
+  productVariants,
+} from "@ikyomm/database";
 import { and, asc, eq } from "drizzle-orm";
 import type { AppBindings } from "@/types/app";
 import { registerCrudResource } from "../shared/crud";
@@ -26,29 +32,30 @@ export async function findProductDetails(id: string) {
     return null;
   }
 
-  const collection = product.collectionId
-    ? await db
-        .select({
-          id: productCollections.id,
-          name: productCollections.name,
-          slug: productCollections.slug,
-          description: productCollections.description,
-          status: productCollections.status,
-        })
-        .from(productCollections)
-        .where(
-          and(
-            eq(productCollections.id, product.collectionId),
-            eq(productCollections.isDeleted, false)
-          )
-        )
-        .limit(1)
-        .then((rows) => rows[0] ?? null)
-    : null;
+  const collectionRows = await db
+    .select({
+      id: productCollections.id,
+      name: productCollections.name,
+      slug: productCollections.slug,
+      description: productCollections.description,
+      status: productCollections.status,
+    })
+    .from(productCollectionProducts)
+    .innerJoin(
+      productCollections,
+      eq(productCollectionProducts.collectionId, productCollections.id)
+    )
+    .where(
+      and(
+        eq(productCollectionProducts.productId, product.id),
+        eq(productCollections.isDeleted, false)
+      )
+    )
+    .orderBy(asc(productCollections.name));
 
   return {
     ...product,
-    collectionId: product.collectionId ?? null,
-    collections: collection ? [collection] : [],
+    collectionIds: collectionRows.map((collection) => collection.id),
+    collections: collectionRows,
   };
 }

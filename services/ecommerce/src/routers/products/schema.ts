@@ -58,31 +58,16 @@ const productCollectionSummarySchema = productCollectionSelectSchema.pick({
 });
 
 export const productWithImagesSchema = productSchemas.selectSchema.extend({
-  collectionId: z.string().nullish(),
+  collectionIds: z.array(z.string()),
   collections: z.array(productCollectionSummarySchema),
 });
 
-/** Optional single collection — empty / null means no collection. */
-const productCollectionIdField = z.preprocess((value) => {
-  if (value === undefined) {
-    return undefined;
-  }
-  if (value === null || value === "") {
-    return null;
-  }
-  if (typeof value !== "string") {
-    return value;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}, z.string().min(1).nullable().optional());
+const productCollectionIdsSchema = {
+  collectionIds: z.array(z.string().trim().min(1)).optional(),
+};
 
-export const productCreateSchema = productSchemas.insertSchema.extend({
-  collectionId: productCollectionIdField,
-});
-export const productUpdateSchema = productSchemas.updateSchema.extend({
-  collectionId: productCollectionIdField,
-});
+export const productCreateSchema = productSchemas.insertSchema.extend(productCollectionIdsSchema);
+export const productUpdateSchema = productSchemas.updateSchema.extend(productCollectionIdsSchema);
 
 const optionalBooleanQuerySchema = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])

@@ -7,6 +7,7 @@ import {
   index,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   uniqueIndex,
@@ -57,7 +58,6 @@ export const products = pgTable(
     subcategoryId: text("subcategory_id")
       .notNull()
       .references(() => subcategories.id, { onDelete: "restrict" }),
-    collectionId: text("collection_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     shortDescription: text("short_description"),
@@ -80,19 +80,34 @@ export const products = pgTable(
     index("treasure_products_brand_id_idx").on(table.brandId),
     index("treasure_products_category_id_idx").on(table.categoryId),
     index("treasure_products_subcategory_id_idx").on(table.subcategoryId),
-    index("treasure_products_collection_id_idx").on(table.collectionId),
     index("treasure_products_status_idx").on(table.status),
     index("treasure_products_product_type_idx").on(table.productType),
-    foreignKey({
-      columns: [table.collectionId],
-      foreignColumns: [productCollections.id],
-      name: "treasure_products_collection_id_fk",
-    }).onDelete("set null"),
     foreignKey({
       columns: [table.categoryId, table.subcategoryId],
       foreignColumns: [subcategories.categoryId, subcategories.id],
       name: "treasure_products_category_subcategory_fk",
     }).onDelete("restrict"),
+  ]
+);
+
+export const productCollectionProducts = pgTable(
+  "treasure_product_collection_products",
+  {
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => productCollections.id, { onDelete: "cascade" }),
+    ...referenceColumns((): AnyPgColumn => user.id),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.productId, table.collectionId],
+      name: "treasure_product_collection_products_pk",
+    }),
+    index("treasure_product_collection_products_product_id_idx").on(table.productId),
+    index("treasure_product_collection_products_collection_id_idx").on(table.collectionId),
   ]
 );
 
