@@ -102,7 +102,7 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
   }
 
   const bodyLimitMiddleware = bodyLimit({
-    maxSize: options.maxBodySizeBytes ?? 1024 * 1024 * 5, // default to 5MB
+    maxSize: options.maxBodySizeBytes ?? 1024 * 1024 * 20, // default to 20MB
     onError: (c) =>
       c.json(
         {
