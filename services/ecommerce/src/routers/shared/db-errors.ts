@@ -19,7 +19,8 @@ const FOREIGN_KEY_MESSAGES: Record<string, string> = {
   treasure_products_category_id_treasure_categories_id_fk: "Selected category does not exist.",
   treasure_products_subcategory_id_treasure_subcategories_id_fk:
     "Selected subcategory does not exist.",
-  treasure_products_collection_id_treasure_product_collections_id_fk:
+  treasure_products_collection_id_fk: "Selected product collection does not exist.",
+  treasure_products_collection_id_treasure_product_collections_id:
     "Selected product collection does not exist.",
   treasure_products_category_subcategory_fk:
     "Selected subcategory does not belong to the selected category.",

@@ -57,9 +57,7 @@ export const products = pgTable(
     subcategoryId: text("subcategory_id")
       .notNull()
       .references(() => subcategories.id, { onDelete: "restrict" }),
-    collectionId: text("collection_id").references(() => productCollections.id, {
-      onDelete: "set null",
-    }),
+    collectionId: text("collection_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     shortDescription: text("short_description"),
@@ -85,6 +83,11 @@ export const products = pgTable(
     index("treasure_products_collection_id_idx").on(table.collectionId),
     index("treasure_products_status_idx").on(table.status),
     index("treasure_products_product_type_idx").on(table.productType),
+    foreignKey({
+      columns: [table.collectionId],
+      foreignColumns: [productCollections.id],
+      name: "treasure_products_collection_id_fk",
+    }).onDelete("set null"),
     foreignKey({
       columns: [table.categoryId, table.subcategoryId],
       foreignColumns: [subcategories.categoryId, subcategories.id],
