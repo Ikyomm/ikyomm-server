@@ -379,14 +379,14 @@ async function createAuthInstance() {
     rateLimit: {
       enabled: true,
       window: 60,
-      max: 100,
+      max: 200,
       customRules: {
-        "/sign-in/email": { window: 60, max: 20 },
-        "/sign-up/email": { window: 60, max: 20 },
-        "/email-otp/send-verification-otp": { window: 60, max: 10 },
-        "/sign-in/email-otp": { window: 60, max: 10 },
-        "/email-otp/request-password-reset": { window: 60, max: 10 },
-        "/forget-password/email-otp": { window: 60, max: 10 },
+        "/sign-in/email": { window: 60, max: 40 },
+        "/sign-up/email": { window: 60, max: 40 },
+        "/email-otp/send-verification-otp": { window: 60, max: 20 },
+        "/sign-in/email-otp": { window: 60, max: 20 },
+        "/email-otp/request-password-reset": { window: 60, max: 20 },
+        "/forget-password/email-otp": { window: 60, max: 20 },
       },
     },
     logger: {
