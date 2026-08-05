@@ -1,4 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: forced */
+/** biome-ignore-all assist/source/organizeImports: forced */
 import { dash } from "@better-auth/infra";
 import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
