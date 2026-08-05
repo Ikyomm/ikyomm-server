@@ -63,11 +63,19 @@ export const productWithImagesSchema = productSchemas.selectSchema.extend({
 });
 
 const productCollectionIdsSchema = {
+  // Many-to-many product collections replace the legacy `collection` text column.
   collectionIds: z.array(z.string().trim().min(1)).optional(),
 };
 
-export const productCreateSchema = productSchemas.insertSchema.extend(productCollectionIdsSchema);
-export const productUpdateSchema = productSchemas.updateSchema.extend(productCollectionIdsSchema);
+// Legacy `collection` text is optional; memberships are written via `collectionIds`.
+export const productCreateSchema = productSchemas.insertSchema.extend({
+  ...productCollectionIdsSchema,
+  collection: z.string().trim().min(1).nullish(),
+});
+export const productUpdateSchema = productSchemas.updateSchema.extend({
+  ...productCollectionIdsSchema,
+  collection: z.string().trim().min(1).nullish(),
+});
 
 const optionalBooleanQuerySchema = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])

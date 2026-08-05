@@ -35,8 +35,10 @@ function getCollectionIds(body: Record<string, unknown>) {
 }
 
 function productRowBody(body: Record<string, unknown>) {
-  const { collectionIds: _collectionIds, ...rowBody } = body;
-  return rowBody;
+  // Strip M2M + legacy collection fields; links are synced in afterCreate/afterUpdate.
+  // Keep writing `collection: null` so the legacy column stays unused after the M2M migration.
+  const { collectionIds: _collectionIds, collection: _legacyCollection, ...rowBody } = body;
+  return { ...rowBody, collection: null };
 }
 
 async function validateProductCollections({ body }: { body: Record<string, unknown> }) {

@@ -99,13 +99,13 @@ function createColumnBaseSchema(column: {
 // Drizzle's InferInsertModel gives us:
 //   notNull, no default  → T              (required)
 //   notNull, has default → T | undefined  (optional — DB fills it)
-//   nullable, no default → T | null       (required but nullable)
+//   nullable, no default → T | null       (required but nullable in SQL inserts)
 //   nullable, has default→ T | null | undefined (optional and nullable)
 //
-// We mirror that exactly:
+// For HTTP create payloads we treat missing nullable fields as null, so:
 //   required             → z.string()
 //   optional             → z.string().optional()
-//   nullable             → z.string().nullable()
+//   nullable             → z.string().nullish()   (undefined → omit/null at write)
 //   optional + nullable  → z.string().nullish()
 
 export function createDbInsertSchema<
@@ -139,15 +139,12 @@ export function createDbInsertSchema<
 
     let fieldSchema: z.ZodTypeAny;
 
-    if (isOptional && isNullable) {
-      // T | null | undefined  →  nullish()
+    if (isNullable) {
+      // API payloads often omit nullable columns — accept undefined and null.
       fieldSchema = base.nullish();
     } else if (isOptional) {
       // T | undefined  →  optional()
       fieldSchema = base.optional();
-    } else if (isNullable) {
-      // T | null  →  nullable()
-      fieldSchema = base.nullable();
     } else {
       // T  →  required as-is
       fieldSchema = base;
