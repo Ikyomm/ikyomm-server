@@ -37,7 +37,7 @@ export const list = createOpenApiRoute({
   path: "/list",
   operationId: "musicList",
   tags,
-  middleware: [recordMethodsRateLimit, musicsRbac.custom("getAll")],
+  middleware: [recordMethodsRateLimit],
   summary: "List music records",
   request: {
     query: musicListQuerySchema,
@@ -52,7 +52,7 @@ export const get = createOpenApiRoute({
   path: "/{id}",
   operationId: "musicGetById",
   tags,
-  middleware: [recordMethodsRateLimit, musicsRbac.custom("get")],
+  middleware: [recordMethodsRateLimit],
   summary: "Get a music by ID",
   request: {
     params: IdStringParamSchema(),

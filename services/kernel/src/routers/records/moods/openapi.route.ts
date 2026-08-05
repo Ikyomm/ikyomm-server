@@ -37,7 +37,7 @@ export const list = createOpenApiRoute({
   path: "/list",
   operationId: "podMoodPresetList",
   tags,
-  middleware: [recordMethodsRateLimit, moodPresetsRbac.custom("getAll")],
+  middleware: [recordMethodsRateLimit],
   summary: "List Pod mood preset records",
   request: {
     query: podMoodPresetListQuerySchema,
@@ -55,7 +55,7 @@ export const get = createOpenApiRoute({
   path: "/{id}",
   operationId: "podMoodPresetGetById",
   tags,
-  middleware: [recordMethodsRateLimit, moodPresetsRbac.custom("get")],
+  middleware: [recordMethodsRateLimit],
   summary: "Get a Pod mood preset by ID",
   request: {
     params: IdStringParamSchema(),
