@@ -101,8 +101,13 @@ export function applyAppSecurity<E extends Env>(app: AppLike<E>, options: AppSec
     );
   }
 
+  const defaultMaxBodySize =
+    (Number(process.env.MAX_MEDIA_FILE_SIZE_MB) || Number(process.env.MAX_BODY_SIZE_MB) || 10) *
+    1024 *
+    1024;
+
   const bodyLimitMiddleware = bodyLimit({
-    maxSize: options.maxBodySizeBytes ?? 1024 * 1024 * 20, // default to 20MB
+    maxSize: options.maxBodySizeBytes ?? defaultMaxBodySize,
     onError: (c) =>
       c.json(
         {
