@@ -24,22 +24,23 @@
     "db:clean:artifacts": "sh -c 'if [ -d drizzle ]; then find drizzle -type f \\( -name \"._*\" -o -name \".__*\" \\) -delete; fi'",
     "db:generate": "pnpm run db:clean:artifacts && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/migration.ts",
+    "music:sync": "tsx src/music-sync.ts",
     "db:push": "pnpm run db:clean:artifacts && drizzle-kit push --config=drizzle.config.ts",
     "db:studio": "pnpm run db:clean:artifacts && drizzle-kit studio --config=drizzle.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.21.0",
+    "pg": "^8.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.7",
     "@ikyomm/typescript-config": "workspace:*",
-    "@types/node": "^25.9.2",
-    "@types/pg": "^8.20.0",
+    "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.4",
     "drizzle-kit": "^0.31.10",
     "tsup": "^8.5.1",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "tsx": "^4.23.9",
+    "typescript": "^7.0.2"
   }
 }

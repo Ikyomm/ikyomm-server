@@ -1,0 +1,1 @@
+ALTER TABLE "treasure_products" DROP COLUMN "collection";
