@@ -18,11 +18,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.0",
-    "@hono/zod-openapi": "^1.5.1",
+    "@hono/zod-openapi": "^1.5.2",
     "@ikyomm/logger": "workspace:*",
     "@ikyomm/utils": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
-    "hono": "^4.13.0",
+    "hono": "^4.13.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
