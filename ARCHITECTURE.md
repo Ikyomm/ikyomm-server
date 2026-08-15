@@ -400,8 +400,8 @@ Polling derives current state from latest logs + mood preset lookup.
 | `BETTER_AUTH_URL` | — | Auth base URL |
 | `CORS_ALLOWED_ORIGINS` | — | Allowed frontend origins |
 | `RESEND_API_KEY` | — | Email delivery |
-| `OMMPODS_SESSION_START_END_DELAY_SECONDS` | — | Session timing |
-| `OMMPODS_SESSION_START_INTRODUCTORY_VIDEO_DURATION` | — | Intro video duration |
+| `OMMPODS_SESSION_START_END_DELAY_SECONDS` | 20 | Door-open window after the session ends (seconds) |
+| `OMMPODS_SESSION_START_INTRODUCTORY_VIDEO_DURATION` | 51 | Prep countdown before paid remaining starts (intro.mp4 length) |
 
 ### DB commands
 

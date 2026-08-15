@@ -41,7 +41,7 @@ export const env = createEnv({
       .string()
       .min(16, "BETTER_AUTH_SECRET must be at least 16 characters long"),
     SESSION_START_END_DELAY_SECONDS: z.coerce.number().int().min(0).default(20),
-    SESSION_START_INTRODUCTORY_VIDEO_DURATION: z.coerce.number().int().min(0).default(30),
+    SESSION_START_INTRODUCTORY_VIDEO_DURATION: z.coerce.number().int().min(0).default(51),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,

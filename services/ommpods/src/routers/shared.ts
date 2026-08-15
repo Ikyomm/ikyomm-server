@@ -183,9 +183,9 @@ export function getSessionStartEndDelaySeconds() {
 }
 
 export function getSessionStartingDelaySeconds() {
-  return (
-    getSessionStartEndDelaySeconds() + Math.max(0, env.SESSION_START_INTRODUCTORY_VIDEO_DURATION)
-  );
+  // Prep matches the intro video only. Door grace uses SESSION_START_END_DELAY
+  // at session end so paid remaining does not shrink during the video.
+  return Math.max(0, env.SESSION_START_INTRODUCTORY_VIDEO_DURATION);
 }
 
 export function buildSessionStartingDelay(remaining = 0) {
