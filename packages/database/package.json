@@ -25,6 +25,9 @@
     "db:generate": "pnpm run db:clean:artifacts && drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/migration.ts",
     "music:sync": "tsx src/music-sync.ts",
+    "music:upload": "tsx src/music-upload.ts",
+    "music:upload-uplift": "tsx src/music-upload.ts --only Uplift",
+    "music:upload-still": "tsx src/music-upload.ts --only Still --apply",
     "db:push": "pnpm run db:clean:artifacts && drizzle-kit push --config=drizzle.config.ts",
     "db:studio": "pnpm run db:clean:artifacts && drizzle-kit studio --config=drizzle.config.ts"
   },

@@ -82,6 +82,18 @@ type VerificationOtpPayload = {
 // Auth instance factory
 // ─────────────────────────────────────────────
 
+type CachedRolePermissions = {
+  data: {
+    panel: string | null;
+    role: string | null;
+    roleId: string | null;
+    permissions: Record<string, { accessLevel: string; actions: Record<string, boolean> }>;
+  };
+  expiresAt: number;
+};
+
+const rolePermissionsCache = new Map<string, CachedRolePermissions>();
+
 async function createAuthInstance() {
   // Resolve DB once — reuse across all hooks in this closure
   const db = resolveAuthDatabase();
@@ -170,7 +182,7 @@ async function createAuthInstance() {
         nonce: env.BETTER_AUTH_SECRET,
         theme: "purple",
       }),
-      dash({ apiKey: env.BETTER_AUTH_API_KEY }),
+      // dash({ apiKey: env.BETTER_AUTH_API_KEY }),
       organization({
         organizationLimit: 10,
         requireEmailVerificationOnInvitation: false,
@@ -193,7 +205,31 @@ async function createAuthInstance() {
           metadata?: schema.UserMetadata | null;
         };
 
-        const cachedUser = await userStatusCache.get(sessionUser.id);
+        const activeOrganizationId =
+          typeof sessionWithOrganization.activeOrganizationId === "string"
+            ? sessionWithOrganization.activeOrganizationId
+            : null;
+
+        const cachedUserPromise = userStatusCache.get(sessionUser.id);
+        const activeMemberPromise = activeOrganizationId
+          ? db
+              .select({
+                role: schema.member.role,
+                panel: schema.member.panel,
+                organizationId: schema.member.organizationId,
+              })
+              .from(schema.member)
+              .where(
+                and(
+                  eq(schema.member.userId, sessionUser.id),
+                  eq(schema.member.organizationId, activeOrganizationId)
+                )
+              )
+              .limit(1)
+              .then((res) => res[0])
+          : Promise.resolve(undefined);
+
+        const cachedUser = await cachedUserPromise;
 
         const liveUser =
           cachedUser ??
@@ -242,6 +278,8 @@ async function createAuthInstance() {
           });
         }
 
+        const activeMember = await activeMemberPromise;
+
         const userWithTags = {
           ...sessionUser,
           banned: liveUser?.banned ?? sessionUser.banned,
@@ -250,71 +288,59 @@ async function createAuthInstance() {
           panel: liveUser?.panel ?? sessionUser.panel,
           metadata: liveUser?.metadata ?? sessionUser.metadata ?? null,
         };
-        const activeOrganizationId =
-          typeof sessionWithOrganization.activeOrganizationId === "string"
-            ? sessionWithOrganization.activeOrganizationId
-            : null;
-        const [activeMember] = activeOrganizationId
-          ? await db
-              .select({
-                role: schema.member.role,
-                panel: schema.member.panel,
-                organizationId: schema.member.organizationId,
-              })
-              .from(schema.member)
-              .where(
-                and(
-                  eq(schema.member.userId, sessionUser.id),
-                  eq(schema.member.organizationId, activeOrganizationId)
-                )
-              )
-              .limit(1)
-          : [];
+
         const resolvedRole = activeMember?.role ?? userWithTags.role ?? null;
         const resolvedPanel = activeMember?.panel ?? userWithTags.panel ?? null;
-        const [roleRecord] = resolvedRole
-          ? await db
-              .select({
-                id: schema.rbacRole.id,
-                panel: schema.rbacRole.panel,
-              })
-              .from(schema.rbacRole)
-              .where(
-                activeMember
-                  ? and(
-                      eq(schema.rbacRole.panel, "company"),
-                      eq(schema.rbacRole.slug, resolvedRole),
-                      eq(
-                        schema.rbacRole.organizationId,
-                        activeMember.organizationId ?? activeOrganizationId
-                      )
-                    )
-                  : and(
-                      eq(schema.rbacRole.panel, resolvedPanel ?? "ikyomm"),
-                      eq(schema.rbacRole.slug, resolvedRole),
-                      isNull(schema.rbacRole.organizationId)
-                    )
-              )
-              .limit(1)
-          : [];
-        const permissionRows = roleRecord
-          ? await db
-              .select({
-                resource: schema.rbacRolePermission.resource,
-                accessLevel: schema.rbacRolePermission.accessLevel,
-                actions: schema.rbacRolePermission.actions,
-              })
-              .from(schema.rbacRolePermission)
-              .where(eq(schema.rbacRolePermission.roleId, roleRecord.id))
-          : [];
 
-        return {
-          session: sessionWithOrganization,
-          user: {
-            ...userWithTags,
-            updatedAt: new Date(liveUser.updatedAt),
-          },
-          authorization: {
+        const roleCacheKey = `${resolvedPanel ?? "none"}:${resolvedRole ?? "none"}:${activeOrganizationId ?? "none"}`;
+        const cachedRoleAuth = rolePermissionsCache.get(roleCacheKey);
+        const now = Date.now();
+
+        let authorizationResult =
+          cachedRoleAuth && cachedRoleAuth.expiresAt > now ? cachedRoleAuth.data : null;
+
+        if (!authorizationResult) {
+          const [roleRecord] = resolvedRole
+            ? await db
+                .select({
+                  id: schema.rbacRole.id,
+                  panel: schema.rbacRole.panel,
+                })
+                .from(schema.rbacRole)
+                .where(
+                  activeMember
+                    ? and(
+                        eq(schema.rbacRole.panel, "company"),
+                        eq(schema.rbacRole.slug, resolvedRole),
+                        eq(
+                          schema.rbacRole.organizationId,
+                          activeMember.organizationId ?? activeOrganizationId
+                        )
+                      )
+                    : and(
+                        eq(
+                          schema.rbacRole.panel,
+                          (resolvedPanel as schema.AccessPanel) ?? "ikyomm"
+                        ),
+                        eq(schema.rbacRole.slug, resolvedRole),
+                        isNull(schema.rbacRole.organizationId)
+                      )
+                )
+                .limit(1)
+            : [];
+
+          const permissionRows = roleRecord
+            ? await db
+                .select({
+                  resource: schema.rbacRolePermission.resource,
+                  accessLevel: schema.rbacRolePermission.accessLevel,
+                  actions: schema.rbacRolePermission.actions,
+                })
+                .from(schema.rbacRolePermission)
+                .where(eq(schema.rbacRolePermission.roleId, roleRecord.id))
+            : [];
+
+          authorizationResult = {
             panel: roleRecord?.panel ?? resolvedPanel,
             role: resolvedRole,
             roleId: roleRecord?.id ?? null,
@@ -327,7 +353,21 @@ async function createAuthInstance() {
                 },
               ])
             ),
+          };
+
+          rolePermissionsCache.set(roleCacheKey, {
+            data: authorizationResult,
+            expiresAt: now + 60_000,
+          });
+        }
+
+        return {
+          session: sessionWithOrganization,
+          user: {
+            ...userWithTags,
+            updatedAt: new Date(liveUser.updatedAt),
           },
+          authorization: authorizationResult,
         };
       }),
       // ✅ Guard runs before emailOTP — intercepts before plugin swallows errors

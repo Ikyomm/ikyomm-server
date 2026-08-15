@@ -194,7 +194,7 @@ export function createDbUpdateSchema<
     // For updates: always optional, preserve nullability
     shape[columnName as keyof UpdateShape<TTable, TOmit>] = (
       isNullable ? base.nullable().optional() : base.optional()
-    ) as UpdateShape<TTable, TOmit>[keyof UpdateShape<TTable, TOmit>];
+    ) as any;
   }
 
   return applySchemaOptions(shape, options);

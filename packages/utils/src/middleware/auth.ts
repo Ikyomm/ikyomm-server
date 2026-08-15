@@ -57,6 +57,7 @@ export interface BetterAuthSessionPayload<
 > {
   user: TUser;
   session: TSession;
+  authorization?: BetterAuthAuthorizationContext;
 }
 
 export interface BetterAuthContextEntityOptions {
@@ -144,14 +145,14 @@ type AuthContextResolutionOutcome =
   | { unavailable: false; context: SerializableAuthContext };
 
 const DEFAULT_SESSION_ENDPOINT_PATH = "/api/auth/get-session";
-const DEFAULT_TIMEOUT_MS = 1_500;
+const DEFAULT_TIMEOUT_MS = 8_000;
 const DEFAULT_RETRY_ATTEMPTS = 1;
 const DEFAULT_RETRY_DELAY_MS = 100;
 const DEFAULT_UNAVAILABLE_FAIL_CACHE_TTL_MS = 1_500;
-const DEFAULT_UNAVAILABLE_FAILURE_THRESHOLD = 2;
+const DEFAULT_UNAVAILABLE_FAILURE_THRESHOLD = 5;
 const DEFAULT_RETRYABLE_STATUS_CODES = [408, 425, 429, 500, 502, 503, 504] as const;
 const DEFAULT_SKIP_PATHS = ["/health", "/favicon.ico", "/favicon.png"];
-const DEFAULT_CACHE_TTL_MS = 3_000;
+const DEFAULT_CACHE_TTL_MS = 10_000;
 const DEFAULT_CACHE_MAX_ENTRIES = 2_000;
 const DEFAULT_AUTHORIZATION_CACHE_TTL_MS = 60_000;
 const DEFAULT_AUTHORIZATION_CACHE_MAX_ENTRIES = 2_000;
@@ -889,19 +890,32 @@ async function resolveFreshAuthContext(options: {
   }
 
   const payload = authSessionOutcome.payload;
+  const userRecord = payload.user as Record<string, unknown>;
 
-  const organizationResolution = await resolveOrganizationContext({
-    userId: normalizeId(payload.user.id),
-    activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
-    includeOrganization: options.entityOptions.organization,
-    includeHasOrganization: options.entityOptions.hasOrganization,
-  });
+  const organizationResolution =
+    !options.entityOptions.organization && typeof userRecord.hasOrganization === "boolean"
+      ? {
+          organization: null,
+          hasOrganization: userRecord.hasOrganization,
+          member: null,
+        }
+      : await resolveOrganizationContext({
+          userId: normalizeId(payload.user.id),
+          activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
+          includeOrganization: options.entityOptions.organization,
+          includeHasOrganization: options.entityOptions.hasOrganization,
+        });
 
-  const authorization = await resolveAuthorizationContext({
-    user: payload.user,
-    member: organizationResolution.member,
-    activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
-  });
+  const authorization =
+    payload.authorization &&
+    typeof payload.authorization === "object" &&
+    payload.authorization.permissions
+      ? payload.authorization
+      : await resolveAuthorizationContext({
+          user: payload.user,
+          member: organizationResolution.member,
+          activeOrganizationId: normalizeId(payload.session.activeOrganizationId),
+        });
 
   return {
     unavailable: false,
