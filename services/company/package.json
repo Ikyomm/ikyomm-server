@@ -18,14 +18,14 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.0",
-    "@hono/zod-openapi": "^1.5.1",
+    "@hono/zod-openapi": "^1.5.3",
     "@ikyomm/database": "workspace:*",
     "@ikyomm/logger": "workspace:*",
     "@ikyomm/notification": "workspace:*",
     "@ikyomm/utils": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.13.0",
+    "hono": "^4.13.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
