@@ -35,7 +35,12 @@ export const env = createEnv({
     LOG_FORMAT: z.enum(["pretty", "json"]),
     CORS_ALLOWED_ORIGINS: corsOriginsSchema,
     DATABASE_URL: z.url("DATABASE_URL must be a valid PostgreSQL connection string"),
-    REDIS_URL: z.url("REDIS_URL must be a valid Redis connection string"),
+    REDIS_URL: z
+      .string()
+      .min(1, "REDIS_URL is required")
+      .refine((val) => /^rediss?:\/\//i.test(val) || /^https?:\/\//i.test(val), {
+        message: "REDIS_URL must be a valid Redis connection string",
+      }),
     AUTH_SERVICE_URL: z.url("AUTH_SERVICE_URL must be a valid URL - e.g. http://auth:6001"),
     BETTER_AUTH_SECRET: z
       .string()
