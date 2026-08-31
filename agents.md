@@ -221,6 +221,7 @@ Pattern:
 - compose healthchecks for runtime services must call `/nodejs/bin/node`, not bare `node`
 - `gateway`, `kernel`, and `ommpods` also need `REDIS_URL` in compose because shared rate-limit and Redis-backed utils are used outside auth
 - avoid reintroducing full single-stage runtime images
+- Dokploy compose deploys write Environment-tab vars to `.env` next to the compose file (`docker/.env` when Compose Path is `./docker/docker-compose.prod.yml`), but run with `--project-directory` at the repo root, so `${VAR}` interpolation does not see those values. `docker/docker-compose.prod.yml` must `env_file: .env` and must not re-list those secrets under `environment:` (empty interpolation overrides `env_file`)
 
 Useful commands:
 
