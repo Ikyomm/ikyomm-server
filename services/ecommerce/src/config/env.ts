@@ -11,7 +11,7 @@ const corsOriginsSchema = z
       .map((origin) => origin.trim())
       .filter(Boolean)
   )
-  .refine((origins) => origins.length > 0, {
+  .refine((origins: string[]) => origins.length > 0, {
     message: "CORS_ALLOWED_ORIGINS must contain at least one origin",
   });
 
