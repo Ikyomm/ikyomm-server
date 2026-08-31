@@ -1,16 +1,21 @@
 name: ikyomm-server
 
 # Dokploy v0.30 runs `docker compose -f ./docker/docker-compose.prod.yml` from
-# the repo root with no `--project-directory`, so the project dir is `docker/`.
-# Build context must be `..` (repo root) or `dockerfile: docker/*.Dockerfile`
-# resolves to `docker/docker/...`. Env-tab vars are written to `docker/.env`;
-# load them with `env_file` and do not re-list those keys under `environment:`
-# (empty `${VAR}` interpolation would override env_file).
+# the repo root with no `--project-directory`. Bake resolves `env_file` from the
+# clone root (`code/.env`) while Dokploy writes Environment-tab vars next to this
+# file (`docker/.env`). List both, and keep them optional so a missing path does
+# not abort the deploy. Build context must be `..` (repo root). Do not re-list
+# secrets under `environment:` — empty `${VAR}` interpolation would override env_file.
 x-service-defaults: &service-defaults
   restart: unless-stopped
   init: true
   env_file:
-    - .env
+    - path: .env
+      required: false
+    - path: docker/.env
+      required: false
+    - path: ../.env
+      required: false
   networks:
     - dokploy-network
   stop_grace_period: 20s
