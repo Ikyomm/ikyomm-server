@@ -9,7 +9,7 @@ services:
   gateway:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/gateway.Dockerfile
     container_name: gateway
     env_file:
@@ -55,7 +55,7 @@ services:
   auth:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/auth.Dockerfile
     container_name: auth
     env_file:
@@ -95,7 +95,7 @@ services:
   kernel:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/kernel.Dockerfile
     container_name: kernel
     env_file:
@@ -135,7 +135,7 @@ services:
   company:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/company.Dockerfile
     container_name: company
     env_file:
@@ -175,7 +175,7 @@ services:
   ommpods:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ommpods.Dockerfile
     container_name: ommpods
     env_file:
@@ -213,7 +213,7 @@ services:
   ecommerce:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ecommerce.Dockerfile
     container_name: ecommerce
     env_file:
