@@ -20,8 +20,8 @@ x-service-defaults: &service-defaults
   logging:
     driver: local
     options:
-      max-size: ${DOCKER_LOG_MAX_SIZE}
-      max-file: ${DOCKER_LOG_MAX_FILE}
+      max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+      max-file: ${DOCKER_LOG_MAX_FILE:-3}
 
 services:
   gateway:
