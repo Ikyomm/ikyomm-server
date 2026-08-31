@@ -1,11 +1,11 @@
 name: ikyomm-server
 
-# Dokploy v0.30 runs `docker compose -f ./docker/docker-compose.prod.yml` from
-# the repo root with no `--project-directory`. Bake resolves `env_file` from the
-# clone root (`code/.env`) while Dokploy writes Environment-tab vars next to this
-# file (`docker/.env`). List both, and keep them optional so a missing path does
-# not abort the deploy. Build context must be `..` (repo root). Do not re-list
-# secrets under `environment:` — empty `${VAR}` interpolation would override env_file.
+# Dokploy runs this from the clone root with
+# `--project-directory <clone>/code -f ./docker/docker-compose.prod.yml`.
+# Build context must be `.` (clone root). `context: ..` resolves to
+# `<clone>/docker` and fails. Env-tab vars are written to `docker/.env`; bake
+# may also look at `<clone>/code/.env`. Keep env_file paths optional. Do not
+# re-list secrets under `environment:` — empty `${VAR}` would override env_file.
 x-service-defaults: &service-defaults
   restart: unless-stopped
   init: true
@@ -40,7 +40,7 @@ services:
   gateway:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/gateway.Dockerfile
     container_name: gateway
     ports:
@@ -82,7 +82,7 @@ services:
   auth:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/auth.Dockerfile
     container_name: auth
     ports:
@@ -108,7 +108,7 @@ services:
   kernel:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/kernel.Dockerfile
     container_name: kernel
     ports:
@@ -138,7 +138,7 @@ services:
   company:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/company.Dockerfile
     container_name: company
     ports:
@@ -168,7 +168,7 @@ services:
   ommpods:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ommpods.Dockerfile
     container_name: ommpods
     ports:
@@ -198,7 +198,7 @@ services:
   ecommerce:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ecommerce.Dockerfile
     container_name: ecommerce
     ports:
