@@ -1,10 +1,11 @@
 name: ikyomm-server
 
-# Dokploy writes Environment-tab vars to `.env` next to this compose file
-# (`docker/.env`), but runs compose with `--project-directory` at the repo root.
-# `${VAR}` interpolation therefore does not see those values. Load `.env` into
-# each container instead, and do not re-list those keys under `environment:`
-# (empty interpolation would override env_file).
+# Dokploy v0.30 runs `docker compose -f ./docker/docker-compose.prod.yml` from
+# the repo root with no `--project-directory`, so the project dir is `docker/`.
+# Build context must be `..` (repo root) or `dockerfile: docker/*.Dockerfile`
+# resolves to `docker/docker/...`. Env-tab vars are written to `docker/.env`;
+# load them with `env_file` and do not re-list those keys under `environment:`
+# (empty `${VAR}` interpolation would override env_file).
 x-service-defaults: &service-defaults
   restart: unless-stopped
   init: true
@@ -34,7 +35,7 @@ services:
   gateway:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/gateway.Dockerfile
     container_name: gateway
     ports:
@@ -76,7 +77,7 @@ services:
   auth:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/auth.Dockerfile
     container_name: auth
     ports:
@@ -102,7 +103,7 @@ services:
   kernel:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/kernel.Dockerfile
     container_name: kernel
     ports:
@@ -132,7 +133,7 @@ services:
   company:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/company.Dockerfile
     container_name: company
     ports:
@@ -162,7 +163,7 @@ services:
   ommpods:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/ommpods.Dockerfile
     container_name: ommpods
     ports:
@@ -192,7 +193,7 @@ services:
   ecommerce:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/ecommerce.Dockerfile
     container_name: ecommerce
     ports:
