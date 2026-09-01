@@ -9,6 +9,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
     description: "Live pod session APIs for bookings, mood/aroma controls, and hardware polling.",
   },
   tags: [
+    { name: "App PWA", description: "Mobile App PWA endpoints for discovery, search, and pods." },
     { name: "Sessions", description: "Pod session booking endpoints." },
     { name: "Control", description: "Active session mood and aroma control endpoints." },
     { name: "Polling", description: "Public hardware polling endpoints." },
@@ -16,7 +17,7 @@ export const openApiInfo: OpenAPIObjectConfigure<any, any> = {
   "x-tagGroups": [
     {
       name: "Ommpods Live APIs",
-      tags: ["Sessions", "Control", "Polling"],
+      tags: ["App PWA", "Sessions", "Control", "Polling"],
     },
   ],
   servers: [
