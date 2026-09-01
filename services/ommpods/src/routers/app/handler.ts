@@ -1,8 +1,8 @@
 import type { AppBindings } from "@/types/app";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
-  OmmPodStatus,
+  type OmmPodStatus,
   OmmPodType,
   db,
   musicPlaylists,
@@ -15,14 +15,16 @@ import {
   walletTransactions,
 } from "@ikyomm/database";
 import {
+  createApiSuccessResponse,
   createBetterAuthSessionMiddleware,
   createErrorResponse,
+  createOpenApiRoute,
   createRequiredAuthSessionMiddleware,
   createSuccessResponse,
   getBetterAuthContext,
+  registerOpenApiRoute,
 } from "@ikyomm/utils";
 import { and, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
-import { z } from "zod";
 import { buildSessionResponse, hydratePodAromaDefusers } from "../shared";
 
 export const appGroup = new OpenAPIHono<AppBindings>();
@@ -202,37 +204,245 @@ appGroup.get("/sessions/active", async (c) => {
 });
 
 const nearbyPodsQuerySchema = z.object({
-  latitude: z.coerce.number().min(-90).max(90).optional(),
-  longitude: z.coerce.number().min(-180).max(180).optional(),
-  radiusKm: z.coerce.number().positive().default(50),
-  search: z.string().trim().optional(),
-  city: z.string().trim().optional(),
-  region: z.string().trim().optional(),
-  locationType: z.string().trim().optional(),
+  latitude: z.coerce
+    .number()
+    .min(-90)
+    .max(90)
+    .optional()
+    .openapi({
+      param: {
+        name: "latitude",
+        in: "query",
+        description: "User's current GPS latitude (-90 to 90)",
+        example: 22.653564,
+      },
+    }),
+  longitude: z.coerce
+    .number()
+    .min(-180)
+    .max(180)
+    .optional()
+    .openapi({
+      param: {
+        name: "longitude",
+        in: "query",
+        description: "User's current GPS longitude (-180 to 180)",
+        example: 88.4450847,
+      },
+    }),
+  radiusKm: z.coerce
+    .number()
+    .positive()
+    .default(50)
+    .openapi({
+      param: {
+        name: "radiusKm",
+        in: "query",
+        description: "Proximity radius in kilometers (defaults to 50km)",
+        example: 50,
+      },
+    }),
+  search: z
+    .string()
+    .trim()
+    .optional()
+    .openapi({
+      param: {
+        name: "search",
+        in: "query",
+        description:
+          "Multi-field search across city, airport, station, state, address, or pod name",
+        example: "Airport",
+      },
+    }),
+  city: z
+    .string()
+    .trim()
+    .optional()
+    .openapi({
+      param: {
+        name: "city",
+        in: "query",
+        description: "Filter pods by city name",
+        example: "Kolkata",
+      },
+    }),
+  region: z
+    .string()
+    .trim()
+    .optional()
+    .openapi({
+      param: {
+        name: "region",
+        in: "query",
+        description: "Filter pods by region or state",
+        example: "West Bengal",
+      },
+    }),
+  locationType: z
+    .string()
+    .trim()
+    .optional()
+    .openapi({
+      param: {
+        name: "locationType",
+        in: "query",
+        description: "Filter pods by location type (e.g. AIRPORT, STATION, MALL, HOTEL)",
+        example: "AIRPORT",
+      },
+    }),
   podType: z
     .string()
     .trim()
     .optional()
-    .refine(
-      (val) =>
-        !val || OmmPodType.enumValues.includes(val as (typeof OmmPodType.enumValues)[number]),
-      { message: "Invalid pod type" }
-    ),
+    .openapi({
+      param: {
+        name: "podType",
+        in: "query",
+        description: "Filter by pod model type (NEO, ORIGINAL, MINI)",
+        example: "NEO",
+      },
+    }),
   status: z
     .string()
     .trim()
     .optional()
-    .refine(
-      (val) =>
-        !val || OmmPodStatus.enumValues.includes(val as (typeof OmmPodStatus.enumValues)[number]),
-      { message: "Invalid pod status" }
-    ),
+    .openapi({
+      param: {
+        name: "status",
+        in: "query",
+        description: "Filter by pod status (ACTIVE, MAINTENANCE, OFFLINE)",
+        example: "ACTIVE",
+      },
+    }),
   onlyAvailable: z
     .enum(["true", "false"])
     .optional()
-    .transform((val) => val === "true"),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+    .openapi({
+      param: {
+        name: "onlyAvailable",
+        in: "query",
+        description: "If true, returns only currently available and unoccupied pods",
+        example: "true",
+      },
+    }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(20)
+    .openapi({
+      param: {
+        name: "limit",
+        in: "query",
+        description: "Pagination page size (max 100, default 20)",
+        example: 20,
+      },
+    }),
+  offset: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(0)
+    .openapi({
+      param: {
+        name: "offset",
+        in: "query",
+        description: "Pagination offset (default 0)",
+        example: 0,
+      },
+    }),
+});
+
+const nearbyPodLocationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string().nullable(),
+  locationType: z.string().nullable(),
+  description: z.string().nullable(),
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
+  zone: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().nullable(),
+      region: z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string().nullable(),
+        })
+        .nullable(),
+    })
+    .nullable(),
+});
+
+const nearbyPodItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  type: z.string(),
+  status: z.string(),
+  rateConfig: z.array(z.record(z.string(), z.unknown())),
+  locationId: z.string().nullable(),
+  location: nearbyPodLocationSchema.nullable(),
+  aromaDefusers: z.array(z.record(z.string(), z.unknown())),
+  aromaDefuser: z.record(z.string(), z.unknown()).nullable(),
+  isAvailable: z.boolean(),
+  activeSession: z
+    .object({
+      id: z.string(),
+      startAt: z.string(),
+      endAt: z.string(),
+      remainingSeconds: z.number(),
+    })
+    .nullable(),
+  distanceKm: z.number().nullable(),
+  distanceMeters: z.number().nullable(),
+});
+
+const nearbyPodsResponseSchema = z.object({
+  items: z.array(nearbyPodItemSchema),
+  total: z.number(),
+  isFallback: z.boolean(),
+  fallbackMessage: z.string().nullable(),
+  limit: z.number(),
+  offset: z.number(),
+});
+
+const appTags = ["App PWA"];
+
+export const getNearbyPodsRoute = createOpenApiRoute({
+  method: "get",
+  path: "/pods/nearby",
+  operationId: "ommpodsAppPodsNearby",
+  tags: appTags,
+  summary: "Find nearby OMMPods and search pods",
+  description:
+    "Returns pods with GPS proximity calculation (Haversine distanceKm and distanceMeters), multi-field search (city, airport, station, state), real-time availability, and smart regional fallback when no pods are within radius.",
+  request: {
+    query: nearbyPodsQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(nearbyPodsResponseSchema, "Nearby pods retrieved successfully"),
+  },
+});
+
+export const getPodsRoute = createOpenApiRoute({
+  method: "get",
+  path: "/pods",
+  operationId: "ommpodsAppPodsList",
+  tags: appTags,
+  summary: "List OMMPods for Mobile App (Alias for /pods/nearby)",
+  description: "Search, filter, and find nearby pods for the mobile app.",
+  request: {
+    query: nearbyPodsQuerySchema,
+  },
+  responses: {
+    200: createApiSuccessResponse(nearbyPodsResponseSchema, "Pods retrieved successfully"),
+  },
 });
 
 function calculateHaversineDistanceKm(
@@ -520,8 +730,8 @@ const handleGetNearbyPods = async (c: Context<AppBindings>) => {
   );
 };
 
-appGroup.get("/pods/nearby", handleGetNearbyPods);
-appGroup.get("/pods", handleGetNearbyPods);
+registerOpenApiRoute(appGroup, getNearbyPodsRoute, handleGetNearbyPods as never);
+registerOpenApiRoute(appGroup, getPodsRoute, handleGetNearbyPods as never);
 
 appGroup.get("/pods/:id", async (c) => {
   const podId = c.req.param("id");
