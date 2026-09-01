@@ -1,6 +1,8 @@
 import type { AppBindings } from "@/types/app";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import type { Context } from "hono";
 import {
+  OmmPodStatus,
   OmmPodType,
   db,
   musicPlaylists,
@@ -13,17 +15,19 @@ import {
   walletTransactions,
 } from "@ikyomm/database";
 import {
+  createBetterAuthSessionMiddleware,
   createErrorResponse,
   createRequiredAuthSessionMiddleware,
   createSuccessResponse,
   getBetterAuthContext,
 } from "@ikyomm/utils";
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import { buildSessionResponse, hydratePodAromaDefusers } from "../shared";
 
 export const appGroup = new OpenAPIHono<AppBindings>();
 
-const appAuthMiddleware = createRequiredAuthSessionMiddleware({
+const appAuthMiddleware = createBetterAuthSessionMiddleware({
   entities: {
     user: true,
     session: true,
@@ -32,6 +36,7 @@ const appAuthMiddleware = createRequiredAuthSessionMiddleware({
     hasOrganization: false,
   },
   enableRedisCache: true,
+  required: false,
 });
 
 appGroup.use("*", appAuthMiddleware);
@@ -195,6 +200,328 @@ appGroup.get("/sessions/active", async (c) => {
     200
   );
 });
+
+const nearbyPodsQuerySchema = z.object({
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  radiusKm: z.coerce.number().positive().default(50),
+  search: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  region: z.string().trim().optional(),
+  locationType: z.string().trim().optional(),
+  podType: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (val) =>
+        !val || OmmPodType.enumValues.includes(val as (typeof OmmPodType.enumValues)[number]),
+      { message: "Invalid pod type" }
+    ),
+  status: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (val) =>
+        !val || OmmPodStatus.enumValues.includes(val as (typeof OmmPodStatus.enumValues)[number]),
+      { message: "Invalid pod status" }
+    ),
+  onlyAvailable: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((val) => val === "true"),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+function calculateHaversineDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const toRad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toRad;
+  const dLon = (lon2 - lon1) * toRad;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 100) / 100;
+}
+
+const handleGetNearbyPods = async (c: Context<AppBindings>) => {
+  const queryResult = nearbyPodsQuerySchema.safeParse(c.req.query());
+  if (!queryResult.success) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "Invalid query parameters.",
+        details: queryResult.error.flatten(),
+      }),
+      400
+    );
+  }
+
+  const {
+    latitude: userLat,
+    longitude: userLng,
+    radiusKm,
+    search,
+    city,
+    region: regionFilter,
+    locationType: locationTypeFilter,
+    podType,
+    status,
+    onlyAvailable,
+    limit,
+    offset,
+  } = queryResult.data;
+
+  const now = new Date();
+
+  // 1. Fetch pods with full location hierarchy (location -> zone -> region)
+  const podRecords = await db.query.pods.findMany({
+    where: and(
+      eq(pods.isDeleted, false),
+      status
+        ? eq(pods.status, status as (typeof OmmPodStatus.enumValues)[number])
+        : eq(pods.status, "ACTIVE"),
+      podType ? eq(pods.type, podType as (typeof OmmPodType.enumValues)[number]) : undefined
+    ),
+    with: {
+      location: {
+        with: {
+          zone: {
+            with: {
+              region: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // 2. Fetch active sessions to determine real-time availability
+  const activeSessions = await db.query.podSessions.findMany({
+    where: and(
+      eq(podSessions.status, "CONFIRMED"),
+      eq(podSessions.isDeleted, false),
+      lte(podSessions.startAt, now),
+      gt(podSessions.endAt, now)
+    ),
+    columns: {
+      id: true,
+      podId: true,
+      startAt: true,
+      endAt: true,
+    },
+  });
+
+  const activeSessionByPodId = new Map(
+    activeSessions.map((s) => [
+      s.podId,
+      {
+        id: s.id,
+        startAt: s.startAt.toISOString(),
+        endAt: s.endAt.toISOString(),
+        remainingSeconds: Math.max(0, Math.ceil((s.endAt.getTime() - now.getTime()) / 1000)),
+      },
+    ])
+  );
+
+  // 3. Search and text filter normalization
+  const normalizedSearch = search?.toLowerCase().trim() ?? null;
+  const searchWords = normalizedSearch ? normalizedSearch.split(/\s+/).filter(Boolean) : [];
+  const normalizedCity = city?.toLowerCase().trim() ?? null;
+  const normalizedRegion = regionFilter?.toLowerCase().trim() ?? null;
+  const normalizedLocationType = locationTypeFilter?.toLowerCase().trim() ?? null;
+
+  // 4. Map pods with coordinates, availability, and distance
+  const hasUserCoordinates =
+    typeof userLat === "number" &&
+    typeof userLng === "number" &&
+    Number.isFinite(userLat) &&
+    Number.isFinite(userLng);
+
+  const processedPods = podRecords.map((pod) => {
+    const loc = pod.location;
+    const activeSession = activeSessionByPodId.get(pod.id) ?? null;
+    const isAvailable = pod.status === "ACTIVE" && activeSession === null;
+
+    let distanceKm: number | null = null;
+    let distanceMeters: number | null = null;
+
+    if (hasUserCoordinates && loc?.latitude && loc?.longitude) {
+      const pLat = Number.parseFloat(loc.latitude);
+      const pLng = Number.parseFloat(loc.longitude);
+      if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
+        distanceKm = calculateHaversineDistanceKm(userLat, userLng, pLat, pLng);
+        distanceMeters = Math.round(distanceKm * 1000);
+      }
+    }
+
+    return {
+      pod,
+      isAvailable,
+      activeSession,
+      distanceKm,
+      distanceMeters,
+    };
+  });
+
+  // Apply availability filter
+  let filtered = processedPods;
+  if (onlyAvailable) {
+    filtered = filtered.filter((item) => item.isAvailable);
+  }
+
+  // Apply multi-field text search (city, airport, station, state, address, name)
+  if (searchWords.length > 0 || normalizedCity || normalizedRegion || normalizedLocationType) {
+    filtered = filtered.filter(({ pod }) => {
+      const loc = pod.location;
+      const zoneName = loc?.zone?.name ?? "";
+      const regName = loc?.zone?.region?.name ?? "";
+      const locName = loc?.name ?? "";
+      const locAddress = loc?.address ?? "";
+      const locType = loc?.locationType ?? "";
+      const podName = pod.name ?? "";
+      const podDesc = pod.description ?? "";
+
+      // Multi-word search matching across all fields
+      if (searchWords.length > 0) {
+        const matchesAllWords = searchWords.every((word) =>
+          [podName, podDesc, locName, locAddress, locType, zoneName, regName].some((field) =>
+            field.toLowerCase().includes(word)
+          )
+        );
+        if (!matchesAllWords) return false;
+      }
+
+      // City filter (checks zone name, address, or location name)
+      if (normalizedCity) {
+        const matchesCity =
+          zoneName.toLowerCase().includes(normalizedCity) ||
+          locAddress.toLowerCase().includes(normalizedCity) ||
+          locName.toLowerCase().includes(normalizedCity);
+        if (!matchesCity) return false;
+      }
+
+      // Region/State filter (checks region name, address, or zone name)
+      if (normalizedRegion) {
+        const matchesRegion =
+          regName.toLowerCase().includes(normalizedRegion) ||
+          locAddress.toLowerCase().includes(normalizedRegion) ||
+          zoneName.toLowerCase().includes(normalizedRegion);
+        if (!matchesRegion) return false;
+      }
+
+      // Location type filter (e.g. Airport, Station, Mall)
+      if (normalizedLocationType) {
+        const matchesType = locType.toLowerCase().includes(normalizedLocationType);
+        if (!matchesType) return false;
+      }
+
+      return true;
+    });
+  }
+
+  // 5. Proximity sorting & Fallback handling
+  let isFallback = false;
+  let fallbackMessage: string | null = null;
+  let finalPods = filtered;
+
+  if (hasUserCoordinates) {
+    // Check which pods fall within radiusKm
+    const withinRadius = filtered.filter(
+      (item) => item.distanceKm !== null && item.distanceKm <= radiusKm
+    );
+
+    if (withinRadius.length > 0) {
+      withinRadius.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+      finalPods = withinRadius;
+      isFallback = false;
+    } else if (filtered.length > 0) {
+      // Fallback: No pods in immediate radius -> show closest available pods
+      filtered.sort((a, b) => {
+        if (a.distanceKm === null && b.distanceKm === null) return 0;
+        if (a.distanceKm === null) return 1;
+        if (b.distanceKm === null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
+      finalPods = filtered;
+      isFallback = true;
+      fallbackMessage = `No pods found within ${radiusKm} km. Showing nearest available pods.`;
+    }
+  } else {
+    // No coordinates: sort alphabetically by pod name
+    filtered.sort((a, b) => a.pod.name.localeCompare(b.pod.name));
+    finalPods = filtered;
+  }
+
+  // 6. Pagination
+  const total = finalPods.length;
+  const paginatedSlice = finalPods.slice(offset, offset + limit);
+
+  // 7. Hydrate aroma diffusers and format response
+  const items = await Promise.all(
+    paginatedSlice.map(async (item) => {
+      const hydratedPod = await hydratePodAromaDefusers(item.pod);
+      const serialized = serializeAppPod(hydratedPod as AppPod);
+      const loc = item.pod.location;
+
+      return {
+        ...serialized,
+        isAvailable: item.isAvailable,
+        activeSession: item.activeSession,
+        distanceKm: item.distanceKm,
+        distanceMeters: item.distanceMeters,
+        location: loc
+          ? {
+              id: loc.id,
+              name: loc.name,
+              address: loc.address ?? null,
+              locationType: loc.locationType ?? null,
+              description: loc.description ?? null,
+              latitude: loc.latitude ?? null,
+              longitude: loc.longitude ?? null,
+              zone: loc.zone
+                ? {
+                    id: loc.zone.id,
+                    name: loc.zone.name,
+                    description: loc.zone.description ?? null,
+                    region: loc.zone.region
+                      ? {
+                          id: loc.zone.region.id,
+                          name: loc.zone.region.name,
+                          description: loc.zone.region.description ?? null,
+                        }
+                      : null,
+                  }
+                : null,
+            }
+          : null,
+      };
+    })
+  );
+
+  return c.json(
+    createSuccessResponse({
+      items,
+      total,
+      isFallback,
+      fallbackMessage,
+      limit,
+      offset,
+    }),
+    200
+  );
+};
+
+appGroup.get("/pods/nearby", handleGetNearbyPods);
+appGroup.get("/pods", handleGetNearbyPods);
 
 appGroup.get("/pods/:id", async (c) => {
   const podId = c.req.param("id");
