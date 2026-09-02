@@ -12,6 +12,7 @@ export const userFields: UserFields[] = [
     name: "panel",
     type: "string",
     input: false,
+    defaultValue: "app",
   },
   {
     name: "metadata",

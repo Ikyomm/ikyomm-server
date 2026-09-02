@@ -445,7 +445,7 @@ async function createAuthInstance() {
             data: {
               ...user,
               id: generateUID(),
-              panel: user.panel ?? null,
+              panel: user.panel ?? "app",
               role: user.role ?? "user",
             },
           }),

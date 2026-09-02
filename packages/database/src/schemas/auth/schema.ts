@@ -42,7 +42,7 @@ export const user = pgTable(
     // For Profile
     image: text("image"),
     role: text("role").default("user").notNull(),
-    panel: AccessPanel("panel").default("ikyomm").notNull(),
+    panel: AccessPanel("panel").default("ikyomm"),
     metadata: jsonb("metadata").$type<UserMetadata>(),
     banned: boolean("banned").default(false),
     banReason: text("ban_reason"),
