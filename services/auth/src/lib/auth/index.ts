@@ -136,7 +136,11 @@ async function createAuthInstance() {
       requireEmailVerification: false,
       password: {
         hash: (password) => PasswordUtils.hash(password),
-        verify: ({ password, hash }) => PasswordUtils.verify(password, hash),
+        verify: async ({ password, hash }) => {
+          const isValid = await PasswordUtils.verify(password, hash);
+          logger.info("Better-Auth password verification attempt", { isValid });
+          return isValid;
+        },
       },
     },
     emailVerification: {
