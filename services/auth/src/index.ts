@@ -116,7 +116,7 @@ app.get("/api/auth/check-email-panel", async (c: Context) => {
     );
   }
 
-  let matchedUser: { id: string; panel: string } | undefined;
+  let matchedUser: { id: string; panel: string | null } | undefined;
 
   try {
     [matchedUser] = await getDB()
