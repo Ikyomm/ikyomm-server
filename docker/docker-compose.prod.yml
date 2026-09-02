@@ -40,7 +40,7 @@ services:
   gateway:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/gateway.Dockerfile
     container_name: gateway
     ports:
@@ -76,7 +76,7 @@ services:
   auth:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/auth.Dockerfile
     container_name: auth
     ports:
@@ -96,7 +96,7 @@ services:
   kernel:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/kernel.Dockerfile
     container_name: kernel
     ports:
@@ -120,7 +120,7 @@ services:
   company:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/company.Dockerfile
     container_name: company
     ports:
@@ -144,7 +144,7 @@ services:
   ommpods:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ommpods.Dockerfile
     container_name: ommpods
     ports:
@@ -168,7 +168,7 @@ services:
   ecommerce:
     <<: *service-defaults
     build:
-      context: ..
+      context: .
       dockerfile: docker/ecommerce.Dockerfile
     container_name: ecommerce
     ports:
