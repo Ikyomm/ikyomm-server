@@ -40,7 +40,7 @@ services:
   gateway:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/gateway.Dockerfile
     container_name: gateway
     ports:
@@ -67,13 +67,7 @@ services:
       ecommerce:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${GATEWAY_PORT:-8000}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${GATEWAY_PORT:-8000}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -82,7 +76,7 @@ services:
   auth:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/auth.Dockerfile
     container_name: auth
     ports:
@@ -93,13 +87,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_FORMAT: ${LOG_FORMAT:-json}
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${AUTH_PORT:-6001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${AUTH_PORT:-6001}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -108,7 +96,7 @@ services:
   kernel:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/kernel.Dockerfile
     container_name: kernel
     ports:
@@ -123,13 +111,7 @@ services:
       auth:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${KERNEL_PORT:-6003}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${KERNEL_PORT:-6003}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -138,7 +120,7 @@ services:
   company:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/company.Dockerfile
     container_name: company
     ports:
@@ -153,13 +135,7 @@ services:
       auth:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${COMPANY_PORT:-6005}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${COMPANY_PORT:-6005}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -168,7 +144,7 @@ services:
   ommpods:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/ommpods.Dockerfile
     container_name: ommpods
     ports:
@@ -183,13 +159,7 @@ services:
       auth:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${OMMPODS_PORT:-6007}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${OMMPODS_PORT:-6007}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -198,7 +168,7 @@ services:
   ecommerce:
     <<: *service-defaults
     build:
-      context: .
+      context: ..
       dockerfile: docker/ecommerce.Dockerfile
     container_name: ecommerce
     ports:
@@ -213,13 +183,7 @@ services:
       auth:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/nodejs/bin/node",
-          "-e",
-          "fetch('http://127.0.0.1:${ECOMMERCE_PORT:-6008}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: [ "CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:${ECOMMERCE_PORT:-6008}/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 10s
       timeout: 5s
       retries: 5
