@@ -116,6 +116,9 @@ async function createAuthInstance() {
       provider: "pg",
       schema,
     }),
+    experimental: {
+      joins: true,
+    },
     secondaryStorage: resolveAuthSecondaryStorage(),
     onAPIError: {
       throw: true,
