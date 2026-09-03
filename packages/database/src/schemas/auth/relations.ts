@@ -30,7 +30,9 @@ export const userRelations = relations(user, ({ many, one }) => {
 
   return {
     accounts: many(account),
+    account: many(account),
     sessions: many(session),
+    session: many(session),
     members: many(member, {
       relationName: memberUserRelationName,
     }),

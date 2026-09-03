@@ -112,10 +112,39 @@ async function createAuthInstance() {
     secret: betterAuthSecret,
     trustedProxyHeaders: isProduction,
     trustedOrigins,
-    database: drizzleAdapter(db, {
-      provider: "pg",
-      schema,
-    }),
+    database: ((authOptions: any) => {
+      const adapter = drizzleAdapter(db, {
+        provider: "pg",
+        schema,
+      })(authOptions);
+
+      return {
+        ...adapter,
+        async findOne(args: any) {
+          const result = await adapter.findOne(args);
+          const userResult = result as
+            | (Record<string, any> & { id: string; account?: any[] })
+            | null
+            | undefined;
+          if (
+            args.model === "user" &&
+            userResult &&
+            args.join?.account &&
+            (!Array.isArray(userResult.account) || userResult.account.length === 0)
+          ) {
+            const accounts = await db
+              .select()
+              .from(schema.account)
+              .where(eq(schema.account.userId, userResult.id));
+            return {
+              ...userResult,
+              account: accounts,
+            };
+          }
+          return result;
+        },
+      };
+    }) as any,
     experimental: {
       joins: true,
     },
