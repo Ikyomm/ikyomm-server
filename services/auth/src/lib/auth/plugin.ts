@@ -158,7 +158,7 @@ export const appAuthPlugin = {
           });
         }
 
-        if (matchedUser.panel !== "app") {
+        if (matchedUser.panel && matchedUser.panel !== "app" && matchedUser.panel !== "ikyomm") {
           throw new APIError("FORBIDDEN", {
             code: "FORBIDDEN",
             message: "This account does not have access to the IKYOMM app.",
