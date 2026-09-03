@@ -1,6 +1,8 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
 import * as schema from "@ikyomm/database";
 import { resolveAuthDatabase, resolveEmailExistsCache } from "./utils";
@@ -110,5 +112,84 @@ export const emailOtpGuardPlugin = {
         }),
       },
     ],
+  },
+} satisfies BetterAuthPlugin;
+
+// ─────────────────────────────────────────────
+// Dedicated App Auth Plugin
+// ─────────────────────────────────────────────
+export const appAuthPlugin = {
+  id: "app-auth",
+  endpoints: {
+    signInApp: createAuthEndpoint(
+      "/app/sign-in",
+      {
+        method: "POST",
+        body: z.object({
+          email: z.string().trim().toLowerCase().email(),
+        }),
+      },
+      async (ctx) => {
+        const { email } = ctx.body;
+        const db = resolveAuthDatabase();
+        const [matchedUser] = await db
+          .select({
+            id: schema.user.id,
+            name: schema.user.name,
+            email: schema.user.email,
+            emailVerified: schema.user.emailVerified,
+            role: schema.user.role,
+            panel: schema.user.panel,
+            company: schema.user.company,
+            metadata: schema.user.metadata,
+            banned: schema.user.banned,
+            banReason: schema.user.banReason,
+            createdAt: schema.user.createdAt,
+            updatedAt: schema.user.updatedAt,
+          })
+          .from(schema.user)
+          .where(eq(schema.user.email, email))
+          .limit(1);
+
+        if (!matchedUser) {
+          throw new APIError("UNAUTHORIZED", {
+            code: "INVALID_EMAIL_OR_PASSWORD",
+            message: "Invalid email or password",
+          });
+        }
+
+        if (matchedUser.panel !== "app") {
+          throw new APIError("FORBIDDEN", {
+            code: "FORBIDDEN",
+            message: "This account does not have access to the IKYOMM app.",
+          });
+        }
+
+        if (matchedUser.banned) {
+          throw new APIError("FORBIDDEN", {
+            code: "FORBIDDEN",
+            message: matchedUser.banReason || "Your account has been banned.",
+          });
+        }
+
+        const session = await ctx.context.internalAdapter.createSession(matchedUser.id);
+        if (!session) {
+          throw new APIError("INTERNAL_SERVER_ERROR", {
+            code: "FAILED_TO_CREATE_SESSION",
+            message: "Failed to create session",
+          });
+        }
+
+        await setSessionCookie(ctx, {
+          session,
+          user: matchedUser as any,
+        });
+
+        return ctx.json({
+          token: session.token,
+          user: matchedUser,
+        });
+      }
+    ),
   },
 } satisfies BetterAuthPlugin;

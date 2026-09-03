@@ -29,7 +29,7 @@ import {
   resolveAuthSecondaryStorage,
 } from "./utils";
 import { generateRandomId, generateUID, PasswordUtils } from "@ikyomm/utils";
-import { emailOtpGuardPlugin } from "./plugin";
+import { emailOtpGuardPlugin, appAuthPlugin } from "./plugin";
 import { and, eq, isNull } from "drizzle-orm";
 
 // ─────────────────────────────────────────────
@@ -376,6 +376,7 @@ async function createAuthInstance() {
       }),
       // ✅ Guard runs before emailOTP — intercepts before plugin swallows errors
       emailOtpGuardPlugin,
+      appAuthPlugin,
       emailOTP({
         expiresIn: 60 * 10, // 10 minutes
         allowedAttempts: 5,
