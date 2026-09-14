@@ -95,6 +95,11 @@ export async function publishResetTimer(podId: string): Promise<void> {
   await publishMqtt(`ommpod/${podId}/timer`, "$SHUT|0$");
 }
 
+export async function publishRgbOff(podId: string): Promise<void> {
+  logger.info("ommpods: turning rgb off (0, 0, 0)", { podId });
+  await publishRgb(podId, 0, 0, 0);
+}
+
 export async function publishRgb(podId: string, r: number, g: number, b: number): Promise<void> {
   const safeR = Math.min(255, Math.max(0, Math.trunc(r)));
   const safeG = Math.min(255, Math.max(0, Math.trunc(g)));
@@ -173,7 +178,7 @@ async function handlePollingStateUpdate(podId: string, data: PollingResponse) {
     // Session just ended or went to idle - unlock door so occupant can exit
     await publishDoorPulse(podId);
     await publishResetTimer(podId);
-    await publishRgb(podId, 255, 255, 255);
+    await publishRgb(podId, 0, 0, 0);
     if (previous.activeDefuserMacId) {
       await publishDiffuserOff(podId, previous.activeDefuserMacId);
     }

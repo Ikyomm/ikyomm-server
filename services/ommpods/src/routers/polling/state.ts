@@ -21,7 +21,7 @@ const NO_SESSION_REDIS_TTL_SECONDS = 5;
 const EXPIRED_SESSION_REDIS_TTL_SECONDS = 5;
 const SESSION_REDIS_GRACE_SECONDS = 60;
 const POLLING_IDLE_RGB = { r: 0, g: 0, b: 0 };
-const POLLING_DELAY_RGB = { r: 255, g: 255, b: 255 };
+const POLLING_DELAY_RGB = { r: 0, g: 0, b: 0 };
 
 type PodWithAromaDefuser = Awaited<ReturnType<typeof findPodWithAromaDefuser>>;
 type PollingStateUpdateListener = (podId: string, data: PollingResponse) => void;
