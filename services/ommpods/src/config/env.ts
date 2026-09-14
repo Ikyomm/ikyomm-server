@@ -47,6 +47,13 @@ export const env = createEnv({
       .min(16, "BETTER_AUTH_SECRET must be at least 16 characters long"),
     SESSION_START_END_DELAY_SECONDS: z.coerce.number().int().min(0).default(20),
     SESSION_START_INTRODUCTORY_VIDEO_DURATION: z.coerce.number().int().min(0).default(51),
+    MQTT_ENABLED: z
+      .string()
+      .optional()
+      .transform((val) => val === undefined || val === "true" || val === "1")
+      .pipe(z.boolean()),
+    MQTT_HOST: z.string().default("172.105.51.188"),
+    MQTT_PORT: z.coerce.number().int().min(1).max(65535).default(6840),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -61,6 +68,9 @@ export const env = createEnv({
     SESSION_START_END_DELAY_SECONDS: process.env.OMMPODS_SESSION_START_END_DELAY_SECONDS,
     SESSION_START_INTRODUCTORY_VIDEO_DURATION:
       process.env.OMMPODS_SESSION_START_INTRODUCTORY_VIDEO_DURATION,
+    MQTT_ENABLED: process.env.OMMPODS_MQTT_ENABLED ?? process.env.MQTT_ENABLED ?? "true",
+    MQTT_HOST: process.env.OMMPODS_MQTT_HOST ?? process.env.MQTT_HOST ?? "172.105.51.188",
+    MQTT_PORT: process.env.OMMPODS_MQTT_PORT ?? process.env.MQTT_PORT ?? "6840",
   },
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
   onValidationError(issues) {

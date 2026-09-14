@@ -73,7 +73,7 @@ function notifyPollingStateUpdated(podId: string, data: PollingResponse) {
 }
 
 function applyPollingRgbState(data: PollingResponse): PollingResponse {
-  if (data.sessionStartingDelay || data.sessionEndingDelay) {
+  if (data.sessionEndingDelay) {
     return {
       ...data,
       ...POLLING_DELAY_RGB,

@@ -44,6 +44,7 @@ import {
 } from "./schema";
 import { findPodSessionById, getPodSessionUsage } from "./utils";
 import { refreshPollingDataForPod } from "../polling/state";
+import { publishDoorPulse } from "../../mqtt";
 
 export const sessionsGroup = new OpenAPIHono<AppBindings>();
 
@@ -124,6 +125,7 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
   }
 
   await refreshPollingDataForPod(result.session.podId);
+  await publishDoorPulse(result.session.podId);
 
   return c.json(
     createSuccessResponse({
@@ -435,6 +437,7 @@ registerOpenApiRoute(sessionsGroup, createSessionRoute, async (c) => {
 
   const responsePod = await findPodWithAromaDefuser(result.podId);
   await refreshPollingDataForPod(result.podId);
+  await publishDoorPulse(result.podId);
 
   return c.json(
     createSuccessResponse(buildSessionResponse(result, new Date(), responsePod?.location)),

@@ -18,6 +18,7 @@ import {
   hydratePodAromaDefusers,
 } from "../shared";
 import { refreshPollingDataForPod } from "../polling/state";
+import { publishDoorPulse, publishResetTimer, publishRgb } from "../../mqtt";
 import { buildPodSocketState } from "../socket/state";
 
 export const tabletGroup = new OpenAPIHono<AppBindings>();
@@ -387,6 +388,7 @@ tabletGroup.post("/pods/:podId/emergency-unlock", async (c) => {
   }
 
   await refreshPollingDataForPod(podId);
+  await publishDoorPulse(podId);
 
   return c.json(
     createSuccessResponse({

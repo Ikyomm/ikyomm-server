@@ -16,6 +16,7 @@ import { openApiInfo } from "@/config/openapi";
 import { logger } from "@/lib/logger";
 import { ommpodsRoutes } from "@/routers";
 import { registerOmmpodsSocketServer } from "@/routers/socket/socket";
+import { initializeOmmpodsMqtt, closeOmmpodsMqtt } from "@/mqtt";
 import type { AppBindings } from "@/types/app";
 
 const app = new OpenAPIHono<AppBindings>();
@@ -54,6 +55,7 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler({ serviceName: "ommpods", logger }));
 
 await initDB({ logger, serviceName: "ommpods" });
+initializeOmmpodsMqtt();
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   logger.info("service started", {
@@ -65,6 +67,43 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
 
 registerOmmpodsSocketServer(server);
 
+let isShuttingDown = false;
+
+async function shutdown(signal: NodeJS.Signals) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  logger.info("ommpods service shutting down", { signal });
+
+  try {
+    await closeOmmpodsMqtt();
+  } catch (error) {
+    logger.error("failed to close ommpods mqtt connection cleanly", { error, signal });
+  }
+
+  server.close(() => {
+    logger.info("ommpods service stopped", { signal });
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    logger.warn("forcing ommpods shutdown after timeout", { signal });
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.once("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+
+process.once("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
+
 export type AppType = typeof routes;
 
 export default app;
+
+export * from "@/mqtt";
