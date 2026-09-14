@@ -10,6 +10,7 @@ import {
 import { eq } from "drizzle-orm";
 import { buildSessionResponse, findActiveSessionForUser } from "../shared";
 import { refreshPollingDataForPod } from "../polling/state";
+import { publishDiffuser, publishDiffuserOff, publishDoorPulse, publishRgb } from "../../mqtt";
 import { updateAromaRoute, updateMoodRoute } from "./openapi.route";
 import {
   appendSessionControlLog,
@@ -69,6 +70,7 @@ registerOpenApiRoute(controlGroup, updateMoodRoute, async (c) => {
     createdByUser: currentUser.id,
   });
   await refreshPollingDataForPod(session.podId);
+  await publishRgb(session.podId, moodPreset.rgb.r, moodPreset.rgb.g, moodPreset.rgb.b);
 
   return c.json(
     createSuccessResponse({
@@ -110,6 +112,7 @@ controlGroup.post("/emergency-unlock/sessions/:sessionId", async (c) => {
     .where(eq(podSessions.id, sessionId))
     .returning();
   await refreshPollingDataForPod(session.podId);
+  await publishDoorPulse(session.podId);
 
   return c.json(
     createSuccessResponse({
@@ -170,6 +173,25 @@ registerOpenApiRoute(controlGroup, updateAromaRoute, async (c) => {
     createdByUser: currentUser.id,
   });
   await refreshPollingDataForPod(session.podId);
+
+  if (activeAromaDefuserId && body.activeDufuserContainerNumber !== null) {
+    const typedDefusers = aromaDefusers as Array<{ id: string; macId?: string | null }>;
+    const selectedDefuser = typedDefusers.find((d) => d.id === activeAromaDefuserId);
+    if (selectedDefuser?.macId) {
+      await publishDiffuser(
+        session.podId,
+        selectedDefuser.macId,
+        body.activeDufuserContainerNumber
+      );
+    }
+  } else {
+    const typedDefusers = aromaDefusers as Array<{ id: string; macId?: string | null }>;
+    for (const d of typedDefusers) {
+      if (d.macId) {
+        await publishDiffuserOff(session.podId, d.macId);
+      }
+    }
+  }
 
   return c.json(
     createSuccessResponse({

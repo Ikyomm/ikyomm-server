@@ -133,9 +133,10 @@ async function handlePollingStateUpdate(podId: string, data: PollingResponse) {
       activeDufuserContainerNumber: activeContainer,
     });
   } else if (previous) {
-    // Session just ended or went to idle
+    // Session just ended or went to idle - unlock door so occupant can exit
+    await publishDoorPulse(podId);
     await publishResetTimer(podId);
-    await publishRgb(podId, 0, 0, 0);
+    await publishRgb(podId, 255, 255, 255);
     if (previous.activeDefuserMacId) {
       await publishDiffuserOff(podId, previous.activeDefuserMacId);
     }

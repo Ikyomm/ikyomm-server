@@ -137,6 +137,75 @@ registerOpenApiRoute(sessionsGroup, emergencyUnlockSessionRoute, async (c) => {
 });
 
 sessionsGroup.use("*", authMiddleware);
+sessionsGroup.post("/scan-unlock", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { podId?: string };
+  const podId = typeof body?.podId === "string" ? body.podId.trim() : null;
+  const { user: currentUser } = getBetterAuthContext(c);
+
+  if (!currentUser) {
+    return c.json(
+      createErrorResponse({
+        error: "Unauthorized",
+        message: "User not authenticated",
+      }),
+      401
+    );
+  }
+
+  if (!podId) {
+    return c.json(
+      createErrorResponse({
+        error: "Bad Request",
+        message: "podId is required",
+      }),
+      400
+    );
+  }
+
+  const now = new Date();
+  const session = await db.query.podSessions.findFirst({
+    where: and(
+      eq(podSessions.podId, podId),
+      eq(podSessions.userId, currentUser.id),
+      inArray(podSessions.status, ["CONFIRMED", "CANCELLED"]),
+      eq(podSessions.isDeleted, false),
+      gt(podSessions.endAt, now)
+    ),
+  });
+
+  const bookingsResult = await db.execute(sql`
+    SELECT id FROM pod_bookings
+    WHERE pod_id = ${podId}
+      AND user_id = ${currentUser.id}
+      AND is_deleted = false
+      AND status IN ('CONFIRMED', 'ACTIVE')
+      AND slot_start <= ${new Date(now.getTime() + 15 * 60 * 1000)}
+      AND slot_end >= ${now}
+    LIMIT 1;
+  `);
+
+  const hasBooking = Array.isArray(bookingsResult.rows) && bookingsResult.rows.length > 0;
+
+  if (!session && !hasBooking) {
+    return c.json(
+      createErrorResponse({
+        error: "Forbidden",
+        message: "No active session or valid booking found for this OMMPod",
+      }),
+      403
+    );
+  }
+
+  await publishDoorPulse(podId);
+
+  return c.json(
+    createSuccessResponse({
+      unlocked: true,
+      message: "Door unlocked for 30s entry window",
+    }),
+    200
+  );
+});
 
 function getSessionPodId(session: Record<string, unknown>) {
   return typeof session.podId === "string" ? session.podId : null;
