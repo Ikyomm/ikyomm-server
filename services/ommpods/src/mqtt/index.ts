@@ -44,9 +44,46 @@ export function publishMqtt(topic: string, message: string): Promise<void> {
   });
 }
 
+const doorLockTimers = new Map<string, NodeJS.Timeout>();
+
+export async function publishDoorUnlock(podId: string): Promise<void> {
+  logger.info("ommpods: unlocking door (DOUT1 LOW)", { podId });
+  await publishMqtt(`ommpod/${podId}/cmd`, "$DOUT1_LOW$");
+}
+
+export async function publishDoorLock(podId: string): Promise<void> {
+  logger.info("ommpods: locking door (DOUT1 HIGH)", { podId });
+  await publishMqtt(`ommpod/${podId}/cmd`, "$DOUT1_HIGH$");
+}
+
+export async function publishDoorUnlockWindow(podId: string, durationSeconds = 30): Promise<void> {
+  logger.info("ommpods: starting door unlock window", { podId, durationSeconds });
+  const existingTimer = doorLockTimers.get(podId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    doorLockTimers.delete(podId);
+  }
+
+  // 1. Immediately unlock door by driving DOUT1 LOW
+  await publishDoorUnlock(podId);
+
+  // 2. Schedule automatic lock after durationSeconds
+  const timer = setTimeout(() => {
+    doorLockTimers.delete(podId);
+    publishDoorLock(podId).catch((err) => {
+      logger.error("ommpods: failed to lock door after window timeout", {
+        podId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }, durationSeconds * 1000);
+
+  doorLockTimers.set(podId, timer);
+}
+
 export async function publishDoorPulse(podId: string): Promise<void> {
-  logger.info("ommpods: triggering door pulse", { podId });
-  await publishMqtt(`ommpod/${podId}/cmd`, "$DOUT1_PULSE$");
+  // Use 30-second unlock window so occupant has plenty of time to enter or exit
+  await publishDoorUnlockWindow(podId, 30);
 }
 
 export async function publishSessionTimer(podId: string, seconds: number): Promise<void> {
